@@ -22,6 +22,9 @@ def _n(value, unit: str = "") -> str:
 
 def headline(r: dict) -> str:
     """The one sentence that sums up a result."""
+    if r["mode"] == "readability":
+        from coinflip.readability import headline as readability_headline
+        return readability_headline(r)
     if r["mode"] == "review":
         if not r["answered_runs"]:
             return "no usable answers"
@@ -114,6 +117,9 @@ def _review_text(r: dict) -> list[str]:
 
 def to_text(r: dict) -> str:
     """Plain-text report of a scored session."""
+    if r["mode"] == "readability":
+        from coinflip.report_readability import to_text as readability_text
+        return readability_text(r)
     out = [
         f"coinflip {r['coinflip']}  |  {_subject(r)}  |  reviewer: {r['reviewer']}  |  {r['runs']} runs",
         "",
@@ -137,6 +143,9 @@ def to_text(r: dict) -> str:
 
 def to_markdown(r: dict) -> str:
     """Markdown report of a scored session, e.g. for a pull request comment."""
+    if r["mode"] == "readability":
+        from coinflip.report_readability import to_markdown as readability_markdown
+        return readability_markdown(r)
     out = [f"### coinflip: `{r['reviewer']}` - {_subject(r)}", "", f"**{headline(r)}**", ""]
     if r["mode"] == "benchmark" and r.get("reliability") is not None:
         rec = r["recall"]

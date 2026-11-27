@@ -73,6 +73,7 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 | 🟦 **The coin-flip matrix** | A self-contained HTML report: one row per finding, one dot per run. Easy to share. |
 | 📈 **Progress reports** | Review, fix, review again - `/coinflip:progress` shows with charts how the findings went down. |
 | 🧹 **Code quality without AI** | Complexity, function size, duplication, readability, documentation and commented-out code as one score - same code, same number, every time. |
+| 📖 **Readability, rated N times** | The AI rates how readable your files are - several times. See which verdicts hold and which are a coin flip. |
 | 🏁 **Benchmark** | 15 planted bugs plus a bug-free twin, to compare reviewers head to head. |
 
 ## What it does not do
@@ -262,6 +263,33 @@ It is a trend line, not a verdict: a 74 is not "bad code", but 74 → 81 after a
 Commented-out code and documentation are detected with simple, documented heuristics, so the
 lists of offenders are meant to be skimmed, not obeyed blindly.
 
+### And what does the AI think? Readability with spread
+
+Rules can count nesting and name lengths - not whether code is easy to *understand*. That takes
+judgement, so coinflip asks the AI - several times - and shows how much the verdict wobbles:
+
+```bash
+coinflip readability -n 5 -j 3          # rates the 8 largest source files, 5 times
+```
+
+```text
+  >> readability 5.5/10 - single runs said anything from 5.1 to 6.0; 1 of 8 files is a coin flip
+
+  RATINGS                 MEAN  RANGE  RULES  STATUS     FILE
+  6 3 5 5 5 2              4.3   2-6      79  COIN FLIP  src/knowledge/index.ts
+  5 5 5 5 5 3              4.7   3-5      67  WOBBLY     src/tools/project.ts
+  4 4 4 4 4 4              4.0   4-4      73  CONSISTENT src/client.ts
+```
+
+<sub>Illustrative output (simulated ratings) - run it on your own code for real numbers.</sub>
+
+Every file gets 1-10 for naming, structure, comments and overall, plus a one-sentence reason per
+run. Files the runs agree are hard to read are your refactoring candidates; a file rated 2 in one
+run and 6 in the next has no reliable verdict - whatever a single review told you about it was
+luck. The HTML report plots every rating as a dot and puts the rule-based score of each file next
+to it (`agreement` = how well the AI's order matches the rules). In Claude Code,
+`/coinflip:quality` offers it after the rule-based score. Each run is one AI request on your plan.
+
 ## Without Claude Code: the command line
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/):
@@ -296,6 +324,7 @@ coinflip report [SESSION] [-f text|markdown|json|html] [-o FILE] [--open]
 coinflip sessions [PATH]             the review sessions of a project, numbered
 coinflip progress [N ...] [--last N] [-f html|text|json] [-o FILE] [--open]
 coinflip quality [PATH] [--diff REF] [--include GLOB] [-f text|markdown|json|html] [--fail-under N]
+coinflip readability [PATH] [--files N] [-n RUNS] [-r SPEC]   AI readability rating with spread
 coinflip bench run -r SPEC ...       run the benchmark
 coinflip compare [-f markdown]       leaderboard of all benchmark sessions
 coinflip bench list | show NAME | export NAME DEST

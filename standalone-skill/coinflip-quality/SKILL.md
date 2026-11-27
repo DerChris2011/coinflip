@@ -1,6 +1,6 @@
 ---
 name: coinflip-quality
-description: Measure the code quality of the user's project without AI - complexity, function size, duplication, readability, documentation and hygiene (commented-out code, debug leftovers, empty catch blocks) - as one score from 0 to 100, then explain the worst spots. Use when the user runs /coinflip-quality or asks how clean, readable, maintainable or well documented their code is.
+description: Measure the code quality of the user's project without AI - complexity, function size, duplication, readability, documentation and hygiene (commented-out code, debug leftovers, empty catch blocks) - as one score from 0 to 100, then explain the worst spots. Optionally let the AI rate readability several times and show how much its verdict wobbles. Use when the user runs /coinflip-quality or asks how clean, readable, maintainable or well documented their code is.
 ---
 
 # coinflip quality
@@ -47,7 +47,30 @@ Explain once that the score is deterministic: it comes from fixed rules (no AI),
 trend line, and every review with `/coinflip` records it automatically. Test files only
 count for the test ratio.
 
-## 4. Report and next step
+## 4. Optional: the AI's view on readability
+
+Rules can count nesting and name lengths, but not whether code is easy to *understand*. If the
+user wants that judgement - or asks whether the AI agrees with the score - offer the AI
+readability rating. It asks the AI several times to rate the largest files (1-10 for naming,
+structure, comments, overall) and shows how far the ratings of each file are apart. **It costs
+one AI run per repetition, so ask first.**
+
+```bash
+uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip readability -n 5 -j 3 -r claude --files 8 -f json
+```
+
+Run it in the background (a few minutes). Key fields: `readability` (mean, 1-10), `run_range`
+(lowest and highest project average of a single run), `consistent` / `wobbly` / `coin_flips`
+(files whose ratings were within 1, 2, or 3+ points), `agreement_with_rules` (rank correlation
+with the rule-based score per file, -1..1), and `files` (each with `ratings`, `mean`, `min`,
+`max`, `status`, `rules_score`, and the one-sentence `reason` of every run).
+
+Present it as: "The AI rates readability 5.5/10 - but single runs said anything from 5.1 to
+6.0. `src/knowledge/index.ts` got 2 in one run and 6 in another: no reliable verdict." Name the
+files the runs agree are hard to read (low mean, consistent) - those are worth refactoring - and
+quote the reasons the runs gave. The HTML report (`HTML report: ...`) shows every rating as a dot.
+
+## 5. Report and next step
 
 For a shareable HTML page: `coinflip quality --open` writes it to `~/.coinflip/quality/` and
 opens it (`-f html -o <path>` to save it elsewhere - ask first, never into the project unasked).

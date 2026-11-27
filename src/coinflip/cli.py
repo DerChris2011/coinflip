@@ -3,20 +3,22 @@
   coinflip review [PATH]      review your own project N times, confidence per finding
   coinflip bench run          measure reviewers on the built-in benchmark (leaderboard)
   coinflip quality [PATH]     deterministic code quality score (no AI)
+  coinflip readability [PATH] AI readability rating, N times - how much does the verdict wobble?
   coinflip report / compare   re-score stored sessions / leaderboard
 """
 
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import webbrowser
 from pathlib import Path
 
 from datetime import datetime
 
-from coinflip import (__version__, benchmark, progress, prompt, quality, report, report_html, report_progress_html,
-                      report_quality, review, reviewers, session, workspace)
+from coinflip import (__version__, benchmark, progress, prompt, quality, readability, report, report_html,
+                      report_progress_html, report_quality, review, reviewers, session, workspace)
 from coinflip.findings import match, parse_answer
 
 RENDER = {"text": report.to_text, "markdown": report.to_markdown, "json": report.to_json}
@@ -102,6 +104,17 @@ def _parser() -> argparse.ArgumentParser:
     qual.add_argument("--fail-under", type=float, metavar="SCORE",
                       help="exit with code 1 if the score is below SCORE (for CI)")
 
+    rd = sub.add_parser("readability", help="let the AI rate the readability of your files N times - "
+                                             "and see how much the rating wobbles")
+    rd.add_argument("path", nargs="?", type=Path, default=Path("."), help="project folder (default: .)")
+    _common(rd, runs=5)
+    rd.add_argument("--files", type=int, default=readability.DEFAULT_FILES, metavar="N",
+                    help=f"rate the N largest source files (default {readability.DEFAULT_FILES}, "
+                         f"max {readability.MAX_FILES})")
+    rd.add_argument("--include", action="append", default=[], metavar="GLOB", help="files to choose from (repeatable)")
+    rd.add_argument("--diff", metavar="REF", help="only rate files changed against a git ref")
+    rd.add_argument("--inline", action="store_true", help="send the code inside the prompt (default for ollama)")
+
     sub.add_parser("reviewers", help="show which reviewer CLIs are installed")
     return p
 
@@ -117,10 +130,15 @@ def _reviewers(specs: list[str] | None) -> list[reviewers.Reviewer]:
     return [reviewers.parse(s) for s in specs]
 
 
-def _progress(label: str, bench=None, known=None):
+def _progress(label: str, bench=None, known=None, rated=None):
     def callback(variant: str, index: int, done: int, answer: reviewers.Answer) -> None:
         if answer.error:
             detail = f"FAILED: {answer.error.splitlines()[-1][:80]}"
+        elif rated is not None:
+            ratings, ok = readability.parse_ratings(answer.text, rated)
+            detail = (f"{len(ratings)}/{len(rated)} files rated, mean "
+                      f"{sum(r['overall'] for r in ratings.values()) / len(ratings):.1f}" if ratings else
+                      "no readable JSON" if not ok else "no file rated")
         else:
             findings, ok = parse_answer(answer.text, known or [])
             detail = f"{len(findings)} findings" if ok else "no readable JSON"
@@ -137,14 +155,14 @@ def _check_counts(args) -> bool:
     return ok
 
 
-def _execute(args, specs, meta, jobs, label, bench=None, known=None, cwd=None) -> list[dict]:
+def _execute(args, specs, meta, jobs, label, bench=None, known=None, cwd=None, rated=None) -> list[dict]:
     out = args.out or session.home()
     results = []
     for reviewer in specs:
         folder = session.new_session_dir(out, label, reviewer)
         try:
             session.collect(folder, meta, reviewer, jobs, args.timeout, args.parallel,
-                            _progress(reviewer.spec, bench, known), cwd=cwd if reviewer.agentic else None)
+                            _progress(reviewer.spec, bench, known, rated), cwd=cwd if reviewer.agentic else None)
         except KeyboardInterrupt:
             _err(f"interrupted - partial results kept in {folder}")
             raise
@@ -411,6 +429,70 @@ def _cmd_quality(args) -> int:
     return 0
 
 
+def _prepare_readability(args, inline: bool):
+    root = args.path.resolve()
+    if not root.is_dir():
+        raise workspace.WorkspaceError(f"not a folder: {root}")
+    files = workspace.list_files(root)
+    pool = workspace.scope(workspace.changed_files(root, args.diff) if args.diff else files, tuple(args.include))
+    rated = readability.select_files(root, pool, args.files)
+    if not rated:
+        raise workspace.WorkspaceError("no source files to rate (use --include to select files)")
+    if inline:
+        contents = workspace.read_files(root, rated)
+        if sum(len(t) for t in contents.values()) > review.DEFAULT_MAX_INLINE_CHARS:
+            raise workspace.WorkspaceError("these files are too large to send inline - use --files with a smaller "
+                                           "number or an agentic reviewer (claude, codex, gemini)")
+        text = readability.inline_prompt(contents)
+    else:
+        text = readability.agent_prompt(rated)
+    commit, dirty = workspace.git_state(root)
+    meta = {
+        "mode": "readability", "project": root.name, "project_path": str(root), "commit": commit, "dirty": dirty,
+        "diff": args.diff, "includes": list(args.include), "inline": inline, "scope_files": len(rated),
+        "files": files, "rated_files": rated,
+        "file_quality": {f: quality.analyse(root, [f])["score"] for f in rated},
+        "quality": quality.analyse(root, workspace.scope(files, tuple(args.include))),
+    }
+    return root, files, meta, text
+
+
+def _cmd_readability(args) -> int:
+    if not _check_counts(args):
+        return EXIT_USAGE
+    if not 1 <= args.files <= readability.MAX_FILES:
+        _err(f"--files must be between 1 and {readability.MAX_FILES}")
+        return EXIT_USAGE
+    try:
+        specs = _reviewers(args.reviewer)
+    except reviewers.ReviewerError as exc:
+        _err(str(exc))
+        return EXIT_USAGE
+    missing = [r.argv[0] for r in specs if not r.available()]
+    if missing:
+        _err(f"not installed or not on PATH: {', '.join(missing)} (see `coinflip reviewers`)")
+        return EXIT_MISSING_CLI
+    inline = args.inline or not all(r.agentic for r in specs)
+    try:
+        root, files, meta, text = _prepare_readability(args, inline)
+    except workspace.WorkspaceError as exc:
+        _err(str(exc))
+        return EXIT_USAGE
+    if args.runs < 3:
+        _err("with fewer than 3 runs the spread says little - 5 is a good start")
+    print(f"coinflip: rating the readability of {len(meta['rated_files'])} files of {meta['project']} - "
+          f"{len(specs)} reviewer(s) x {args.runs} runs on a temporary copy", file=sys.stderr)
+    copy = workspace.make_copy(root, files)
+    try:
+        results = _execute(args, specs, meta, [("readability", text, args.runs)], "readability",
+                           cwd=copy, rated=meta["rated_files"])
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        shutil.rmtree(copy, ignore_errors=True)
+    return 0 if any(r["parsed_runs"] for r in results) else 1
+
+
 def _cmd_reviewers() -> int:
     for name in reviewers.PRESET_NAMES:
         spec = "ollama:<model>" if name == "ollama" else name
@@ -433,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
         "sessions": lambda: _cmd_sessions(args),
         "progress": lambda: _cmd_progress(args),
         "quality": lambda: _cmd_quality(args),
+        "readability": lambda: _cmd_readability(args),
         "reviewers": _cmd_reviewers,
     }
     return handlers[args.command]()

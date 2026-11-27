@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from coinflip import __version__, benchmark, metrics, prompt, report_html, reviewers
+from coinflip import __version__, benchmark, metrics, prompt, readability, report_html, reviewers
 from coinflip.findings import match, parse_answer
 
 Progress = Callable[[str, int, int, reviewers.Answer], None]
@@ -158,6 +158,18 @@ def _runs(session: Path, meta: dict, variant: str, known: list[str], bench=None)
     return runs
 
 
+def _rating_runs(session: Path, meta: dict) -> list[dict]:
+    runs = []
+    for record in meta["runs"]:
+        run = {"index": record["index"], "seconds": record["seconds"], "error": record["error"],
+               "parsed": False, "ratings": {}}
+        if record["error"] is None:
+            text = (session / record["file"]).read_text(encoding="utf-8")
+            run["ratings"], run["parsed"] = readability.parse_ratings(text, meta["rated_files"])
+        runs.append(run)
+    return runs
+
+
 SNIPPET_CONTEXT = 2
 MAX_SNIPPETS = 60
 
@@ -204,6 +216,9 @@ def score(session: Path) -> dict:
         clean = _runs(session, meta, "clean", known)
         summary = metrics.summarize_benchmark(bench, buggy, clean)
         _add_snippets(summary.get("bugs", []), lambda rel: buggy_files.get(rel, "").splitlines() or None)
+    elif meta["mode"] == "readability":
+        summary = readability.summarize(_rating_runs(session, meta), meta["rated_files"],
+                                        meta.get("file_quality", {}))
     else:
         runs = _runs(session, meta, "review", meta["files"])
         summary = metrics.summarize_review(runs, meta.get("canaries", []))

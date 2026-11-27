@@ -77,6 +77,24 @@ def canary_findings() -> list[dict]:
     return found
 
 
+def readability_ratings() -> list[dict]:
+    """SUSPICIOUS files: always 4. MAYBE files: 3 or 8 depending on the run (a coin flip). Others: 7."""
+    listed = re.findall(r"^- (\S+)$", prompt.split("Answer with ONLY")[0], re.MULTILINE)
+    out = []
+    for rel in listed:
+        if "The project is in your current working directory" in prompt:
+            text = (Path.cwd() / rel).read_text()
+        else:
+            text = prompt.split(f"===== FILE: {rel} =====", 1)[1].split("===== FILE:", 1)[0]
+        score = 4 if "SUSPICIOUS" in text else (3 if run % 2 else 8) if "MAYBE" in text else 7
+        out.append({"file": rel, "naming": score, "structure": score, "comments": 5, "overall": score,
+                    "reason": f"run {run} thinks {rel} reads like a {score}"})
+    return out
+
+
+if "Rate the readability of each file" in prompt:
+    print("```json\n" + json.dumps(readability_ratings()) + "\n```")
+    raise SystemExit(0)
 if "The project is in your current working directory" in prompt:
     files = {p.relative_to(Path.cwd()).as_posix(): p.read_text().split("\n")
              for p in Path.cwd().rglob("*.py")}
