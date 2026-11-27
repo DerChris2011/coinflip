@@ -32,7 +32,9 @@ def _scope(root: Path, files: list[str], includes: tuple[str, ...], ref: str | N
     changed = workspace.changed_files(root, ref)
     selected = workspace.scope(changed, includes)
     if not selected:
-        raise workspace.WorkspaceError(f"no changed source files compared to '{ref}' - nothing to review")
+        raise workspace.WorkspaceError(
+            f"no changed source files compared to '{ref}' - nothing to review. "
+            "Run `coinflip review` for the whole project, or `--diff HEAD~3` for the last 3 commits.")
     return selected
 
 
