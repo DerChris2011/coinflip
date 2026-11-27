@@ -58,7 +58,7 @@ Run from the project root. It takes several minutes (each run is a full review),
 **in the background** and check its output until it has finished. Never use a short timeout.
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@3da316a628bffc2763fbb09e2083d953fc1754c2 coinflip review <scope options> -n 5 -j 3 -r claude
+uvx --from git+https://github.com/DerChris2011/coinflip@544399356bc395e09a4f1ad68bf658d3f431acb6 coinflip review <scope options> -n 5 -j 3 -r claude
 ```
 
 `-j 3` runs three reviews in parallel. Tell the user roughly how long to expect (about
@@ -74,7 +74,7 @@ show the user the message and stop instead of retrying in a loop.
 When it has finished, get the structured result of the latest session:
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@3da316a628bffc2763fbb09e2083d953fc1754c2 coinflip report -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@544399356bc395e09a4f1ad68bf658d3f431acb6 coinflip report -f json
 ```
 
 Key fields: `distinct_findings`, `consistent`, `coin_flips`, `once`, `single_run_coverage`
@@ -112,7 +112,7 @@ finding, one column per run, plus code snippets and every raw answer). coinflip 
 path as `HTML report: ...`. Mention it in one line and offer to open it:
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@3da316a628bffc2763fbb09e2083d953fc1754c2 coinflip report --open
+uvx --from git+https://github.com/DerChris2011/coinflip@544399356bc395e09a4f1ad68bf658d3f431acb6 coinflip report --open
 ```
 
 If the user wants to keep or share it, ask where to save it. Do not write it into the project
