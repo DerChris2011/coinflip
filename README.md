@@ -35,11 +35,29 @@ coinflip 0.2.2  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude 
 
 ## The easy way: inside Claude Code
 
-Three commands in Claude Code, nothing else to set up:
+Install the plugin once - it then works in the terminal **and** in the VS Code extension
+(both share the same plugins).
+
+**Terminal (Claude Code CLI):**
 
 ```text
 /plugin marketplace add DerChris2011/coinflip
 /plugin install coinflip@coinflip
+```
+
+**VS Code extension:** paste this into your browser's address bar - it opens VS Code
+straight at the install dialog:
+
+```text
+vscode://anthropic.claude-code/install-plugin?plugin=coinflip&marketplace=DerChris2011/coinflip
+```
+
+Or type `/plugins` in the Claude Code panel, add `DerChris2011/coinflip` in the
+**Marketplaces** tab, then install **coinflip** in the **Plugins** tab.
+
+**Then, in any project:**
+
+```text
 /coinflip:review
 ```
 
@@ -50,15 +68,13 @@ It only needs [uv](https://docs.astral.sh/uv/) - and asks before installing it.
 
 You can also just say: *"review my changes with coinflip, 10 runs, with canaries"*.
 
-**`/plugin` not available?** (Claude desktop app, IDE extension) Install the plugin from a terminal
-instead - it is then available everywhere Claude Code runs:
+<details>
+<summary>Install fails with an error about another marketplace, or no plugin support at all?</summary>
 
-```bash
-claude plugin marketplace add DerChris2011/coinflip
-claude plugin install coinflip@coinflip
-```
+If installing reports `Failed to load marketplace "claude-plugins-official"`, refresh that
+marketplace first: `claude plugin marketplace update claude-plugins-official`.
 
-Or copy the skill file into your personal skills folder and run it as `/coinflip`:
+Without plugin support, copy the skill into your personal skills folder and run it as `/coinflip`:
 
 ```bash
 # macOS / Linux
@@ -70,6 +86,7 @@ mkdir -p ~/.claude/skills/coinflip && curl -fsSL -o ~/.claude/skills/coinflip/SK
 New-Item -ItemType Directory -Force "$HOME\.claude\skills\coinflip" | Out-Null
 Invoke-WebRequest https://raw.githubusercontent.com/DerChris2011/coinflip/main/standalone-skill/coinflip/SKILL.md -OutFile "$HOME\.claude\skills\coinflip\SKILL.md"
 ```
+</details>
 
 ## Install the command-line tool
 
