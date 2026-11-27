@@ -23,7 +23,7 @@ Run `uv --version`. If it fails, tell the user coinflip needs `uv` and ask befor
 ## 2. Find the reviews of this project
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@6004114c77b271a12a8da7c8cea4cdd233f76a1b coinflip sessions -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip sessions -f json
 ```
 
 Each entry has `number`, `started` (UTC - show it in the user's local time), `commit`
@@ -54,7 +54,7 @@ uncommitted work. Recommend comparing reviews with the same scope and run count.
 ## 4. Build the report
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@6004114c77b271a12a8da7c8cea4cdd233f76a1b coinflip progress <numbers> --open
+uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip progress <numbers> --open
 ```
 
 Without numbers it compares all reviews; `--last 2` compares the last two. It prints a short

@@ -22,7 +22,7 @@ Run from the project root. Use what the user asked for: the whole project by def
 with `--include "src/payments/**"`, or only changed files with `--diff main` / `--diff HEAD`.
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@PINNED_COMMIT coinflip quality <options> -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip quality <options> -f json
 ```
 
 Key fields: `score` (0-100) and `grade` (A-E), `parts` (complexity, size, duplication,
