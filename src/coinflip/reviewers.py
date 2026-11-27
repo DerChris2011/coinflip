@@ -72,6 +72,7 @@ def _split(command: str) -> list[str]:
 
 
 def parse(spec: str) -> Reviewer:
+    """Turn a reviewer spec (claude, codex, ollama:model, cmd:...) into a Reviewer."""
     if spec.startswith("cmd:"):
         argv = _split(spec[4:])
         if not argv:

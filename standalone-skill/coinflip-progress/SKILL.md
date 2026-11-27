@@ -9,8 +9,8 @@ disable-model-invocation: true
 The user has reviewed this project with coinflip more than once - typically review, fix, review
 again - and wants to see whether the fixes worked. coinflip compares the chosen review sessions
 and writes a self-contained HTML report with charts: findings per review by confidence and by
-severity, how reliable each review was, what happened to each finding (fixed, still there, new),
-and findings per file.
+severity, how reliable each review was, the code quality score per review (measured without AI),
+what happened to each finding (fixed, still there, new), and findings per file.
 
 Run every command from the project root.
 
@@ -72,8 +72,11 @@ Short and in the user's language:
 3. **Still there** and **new:** name the consistent ones that are still there and any new
    high-severity ones (`coinflip progress <numbers> -f json` gives the full list in `findings`,
    each with `fate`, `file`, `line`, `title`, `cells`).
-4. The warnings coinflip printed, if any.
-5. The path of the HTML report.
+4. **Code quality** before → after, when the JSON has `summary.quality_before` and
+   `summary.quality_after` (for example "Code quality 68 → 74"), and which part changed most
+   (`sessions[].quality.parts`). Reviews made before coinflip 0.4.0 have no quality score.
+5. The warnings coinflip printed, if any.
+6. The path of the HTML report.
 
 Say once that following a single finding from one review to the next is a best guess (lines move
 when code changes, wording differs between runs), while the counts per review are exact.

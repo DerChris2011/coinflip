@@ -38,6 +38,7 @@ class Run:
 
 
 def status(rate: float) -> str:
+    """Classify a hit rate: consistent / coin flip / once (reviews) or reliable / coin flip / missed (benchmarks)."""
     if rate >= RELIABLE_RATE:
         return "reliable"
     if rate <= MISSED_RATE:
@@ -46,6 +47,7 @@ def status(rate: float) -> str:
 
 
 def jaccard_mean(sets: list[set]) -> float | None:
+    """Mean pairwise Jaccard overlap between runs - 100 means every run found the same set."""
     if len(sets) < 2:
         return None
     scores = [len(a & b) / len(a | b) if a | b else 1.0 for a, b in combinations(sets, 2)]
@@ -92,6 +94,7 @@ def _bug_rows(bench: Benchmark, answered: list[Run]) -> list[dict]:
 
 
 def summarize_benchmark(bench: Benchmark, buggy: list[Run], clean: list[Run]) -> dict:
+    """Score benchmark runs against the planted bugs (and the clean twin)."""
     answered = [r for r in buggy if r.answered]
     clean_answered = [r for r in clean if r.answered]
     base = {

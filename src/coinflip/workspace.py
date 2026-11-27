@@ -66,6 +66,7 @@ def _in_skipped_dir(rel: str) -> bool:
 
 
 def is_source(rel: str) -> bool:
+    """Is this a source file coinflip reviews (by extension, not in a skipped folder)?"""
     name = rel.rsplit("/", 1)[-1]
     if name.endswith((".min.js", ".d.ts")) or "." not in name:
         return False
@@ -73,12 +74,14 @@ def is_source(rel: str) -> bool:
 
 
 def scope(files: list[str], includes: tuple[str, ...]) -> list[str]:
+    """Source files, optionally narrowed by --include globs."""
     if includes:
         return [f for f in files if any(fnmatch(f, pattern) for pattern in includes)]
     return [f for f in files if is_source(f)]
 
 
 def changed_files(root: Path, ref: str) -> list[str]:
+    """Files changed against a git ref, including uncommitted and untracked ones."""
     if not is_git(root):
         raise WorkspaceError("--diff needs a git repository")
     if _git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}") is None:
@@ -89,6 +92,7 @@ def changed_files(root: Path, ref: str) -> list[str]:
 
 
 def diff_text(root: Path, ref: str, files: list[str]) -> str:
+    """The unified diff against a git ref, limited to the given files."""
     tracked = _git(root, "diff", "--relative", "-U3", ref, "--", *files) or ""
     untracked = set((_git(root, "ls-files", "--others", "--exclude-standard") or "").splitlines())
     new = [f"New file (not yet committed): {f}" for f in files if f in untracked]
@@ -145,6 +149,7 @@ def patch_diff(diff: str, replacements: dict[tuple[str, int], str]) -> str:
 
 
 def make_copy(root: Path, files: list[str]) -> Path:
+    """Copy the files into a temporary folder the reviewer can read."""
     dest = Path(tempfile.mkdtemp(prefix="coinflip-ws-"))
     for rel in files:
         src = root / rel

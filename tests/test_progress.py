@@ -133,3 +133,36 @@ def test_local_time_falls_back_gracefully():
     assert progress.local_time(None) == ""
     assert progress.local_time("not a date at all") == "not a date at all"[:16]
     assert len(progress.local_time("2026-11-27T19:13:00+00:00")) == 16
+
+
+def test_progress_tracks_code_quality(fake, project, capsys):
+    _review(fake, project)
+    write(project, "src/legacy.py", "def handle_data(data, tmp):\n    # old = data * 2\n    # print(old)\n"
+                                    "    try:\n        return data\n    except Exception:\n        pass\n")
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "legacy")
+    _review(fake, project)
+    capsys.readouterr()
+    assert main(["progress", "--project", str(project), "-f", "json"]) == 0
+    p = json.loads(capsys.readouterr().out)
+    s = p["summary"]
+    assert s["quality_before"] is not None and s["quality_after"] < s["quality_before"]
+    assert all(st["quality"]["parts"] for st in p["sessions"])
+    html = report_progress_html.render(p)
+    assert "Code quality score per review" in html and "code quality (no AI)" in html
+    assert "code quality" in progress.to_text(p)
+
+
+def test_progress_warns_when_old_sessions_have_no_quality(fake, project, capsys):
+    _review(fake, project)
+    _review(fake, project)
+    first = progress.project_sessions(project.parent / "home" / "sessions", project)[0]
+    meta = json.loads((first / "meta.json").read_text())
+    meta.pop("quality")
+    (first / "meta.json").write_text(json.dumps(meta))
+    capsys.readouterr()
+    assert main(["progress", "--project", str(project), "-f", "json"]) == 0
+    p = json.loads(capsys.readouterr().out)
+    assert p["summary"]["quality_before"] is None
+    assert any("only measured for some reviews" in w for w in p["warnings"])
+    assert "Code quality" in report_progress_html.render(p)

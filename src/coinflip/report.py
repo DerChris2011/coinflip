@@ -21,6 +21,7 @@ def _n(value, unit: str = "") -> str:
 
 
 def headline(r: dict) -> str:
+    """The one sentence that sums up a result."""
     if r["mode"] == "review":
         if not r["answered_runs"]:
             return "no usable answers"
@@ -112,6 +113,7 @@ def _review_text(r: dict) -> list[str]:
 
 
 def to_text(r: dict) -> str:
+    """Plain-text report of a scored session."""
     out = [
         f"coinflip {r['coinflip']}  |  {_subject(r)}  |  reviewer: {r['reviewer']}  |  {r['runs']} runs",
         "",
@@ -126,11 +128,15 @@ def to_text(r: dict) -> str:
         out += _review_text(r)
     elif r["mode"] == "review" and r.get("canary"):
         out += _canary_text(r["canary"], r["answered_runs"])
+    if r["mode"] == "review" and r.get("quality"):
+        from coinflip.quality import one_line
+        out += ["", f"  {one_line(r['quality'])}  (no AI - details: coinflip quality)"]
     out += _failure_lines(r)
     return "\n".join(out) + "\n"
 
 
 def to_markdown(r: dict) -> str:
+    """Markdown report of a scored session, e.g. for a pull request comment."""
     out = [f"### coinflip: `{r['reviewer']}` - {_subject(r)}", "", f"**{headline(r)}**", ""]
     if r["mode"] == "benchmark" and r.get("reliability") is not None:
         rec = r["recall"]
@@ -156,6 +162,9 @@ def to_markdown(r: dict) -> str:
         out += ["| Found | Status | Severity | Where | Finding |", "|---:|---|---|---|---|"]
         out += [f"| {f['hits']}/{r['answered_runs']} | {f['status']} | {f['severity'] or '-'} "
                 f"| `{f['file']}:{f['line']}` | {f['title']} |" for f in r["findings"][:100]]
+    if r["mode"] == "review" and r.get("quality") and r["quality"].get("score") is not None:
+        from coinflip.quality import one_line
+        out += ["", f"_{one_line(r['quality'])}_ (no AI)"]
     return "\n".join(out) + "\n"
 
 
@@ -164,6 +173,7 @@ def to_json(r: dict) -> str:
 
 
 def compare(results: list[dict], markdown: bool = False) -> str:
+    """Leaderboard of several benchmark sessions."""
     rows = sorted(
         (r for r in results if r["mode"] == "benchmark" and r.get("reliability") is not None),
         key=lambda r: (-r["reliability"], -(r["recall"]["mean"] or 0), r["reviewer"]),

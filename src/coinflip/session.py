@@ -49,6 +49,7 @@ def home() -> Path:
 
 
 def new_session_dir(out: Path, label: str, reviewer: reviewers.Reviewer) -> Path:
+    """Create the folder for a new session."""
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = out / f"{stamp}-{label}-{reviewer.slug}"
     suffix = 1
@@ -135,6 +136,7 @@ def previous_findings(sessions_dir: Path, project_path: Path) -> set[tuple[str, 
 
 
 def load_meta(session: Path) -> dict:
+    """Read meta.json of a session folder."""
     path = session / "meta.json"
     if not path.is_file():
         raise FileNotFoundError(f"not a coinflip session folder: {session}")
@@ -186,9 +188,10 @@ def _project_reader(root: str | None):
 
 
 def score(session: Path) -> dict:
+    """Score a session from its raw answers; writes results.json and report.html."""
     meta = load_meta(session)
     header = {k: meta.get(k) for k in ("coinflip", "reviewer", "started", "benchmark", "project", "diff",
-                                       "scope_files", "commit", "dirty")}
+                                       "scope_files", "commit", "dirty", "quality")}
     header["session"] = session.name
     if meta["mode"] == "benchmark":
         bench, buggy_files, _ = benchmark.build(meta["benchmark_name"])

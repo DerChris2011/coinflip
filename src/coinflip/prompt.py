@@ -55,6 +55,7 @@ def agent(scope: list[str], all_files: int, diff: str | None) -> str:
 
 
 def inline_review(files: dict[str, str], diff: str | None) -> str:
+    """Prompt with the code inside it, for reviewers that cannot read files."""
     parts = [TASK]
     if diff is not None:
         parts += ["Review THIS CHANGE. The full current content of the changed files follows the diff.",

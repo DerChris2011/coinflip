@@ -79,8 +79,9 @@ uvx --from git+https://github.com/DerChris2011/coinflip@6004114c77b271a12a8da7c8
 
 Key fields: `distinct_findings`, `consistent`, `coin_flips`, `once`, `single_run_coverage`
 (how much of all findings one review alone showed, in percent), `stability`, `findings`
-(each with `file`, `line`, `severity`, `title`, `hits`, `status`), and `canary` when canaries
-were planted.
+(each with `file`, `line`, `severity`, `title`, `hits`, `status`), `canary` when canaries
+were planted, and `quality` - the code quality score coinflip measured without AI on the same
+code (`score`, `grade`, `parts`).
 
 ## 5. Verify and present
 
@@ -102,6 +103,8 @@ Present the result short and in the user's language:
    which it misses (its blind spots on this code) - and recommend a unit test where a missed
    kind sits in important logic. Never list canaries as findings - they only exist in the
    temporary copy.
+6. **Code quality** in one line: "Code quality 74/100 (C), weakest: documentation 14 %." It is
+   measured without AI, so it does not wobble between runs. For details offer `/coinflip-quality`.
 
 Never invent findings that are not in the report, and never change the counts.
 
@@ -120,7 +123,8 @@ unasked. To save a copy: `coinflip report -f html -o <path>/coinflip-report.html
 For a pull request or issue: `coinflip report -f markdown`.
 
 If this project already had earlier coinflip reviews, mention once that `/coinflip-progress`
-compares them in a report with charts - do not build that report yourself.
+compares them in a report with charts (including the code quality trend) - do not build that
+report yourself.
 
 Then offer one of these, whichever fits:
 - fix the confirmed findings (ask before editing any file)

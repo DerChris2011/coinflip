@@ -159,7 +159,15 @@ def _session_stats(result: dict, meta: dict, folder: Path) -> dict:
         "stability": result.get("stability"),
         "severity": severities,
         "files": files,
+        "quality": _quality_stats(meta.get("quality")),
     }
+
+
+def _quality_stats(q: dict | None) -> dict | None:
+    if not q or q.get("score") is None:
+        return None
+    return {"score": q["score"], "grade": q.get("grade"), "parts": q.get("parts", {}), "version": q.get("version"),
+            "nloc": q.get("nloc"), "hygiene_counts": q.get("hygiene_counts", {})}
 
 
 def _warnings(stats: list[dict]) -> list[str]:
@@ -170,6 +178,11 @@ def _warnings(stats: list[dict]) -> list[str]:
         out.append("The reviews used different numbers of runs - more runs find more coin flips and one-offs.")
     if len({s["reviewer"] for s in stats}) > 1:
         out.append("Different reviewers were used.")
+    measured = [s["quality"] for s in stats if s["quality"]]
+    if measured and len(measured) < len(stats):
+        out.append("Code quality was only measured for some reviews (it exists since coinflip 0.4.0).")
+    if len({q.get("version") for q in measured}) > 1:
+        out.append("Code quality was measured with different rule versions - the scores are not directly comparable.")
     if any(s["canaries"] for s in stats):
         out.append("Some reviews had canaries planted; their findings exclude the canaries but ran on slightly changed code.")
     return out
@@ -180,6 +193,7 @@ def _pct_change(before: int, after: int) -> float | None:
 
 
 def compare(folders: list[Path]) -> dict:
+    """Compare two or more review sessions of one project, oldest first."""
     if len(folders) < 2:
         raise ProgressError("comparing needs at least 2 review sessions of the same project")
     loaded = []
@@ -236,6 +250,8 @@ def compare(folders: list[Path]) -> dict:
             "still_there": fates["still there"],
             "new": fates["new"],
             "came_and_went": fates["came and went"],
+            "quality_before": (first["quality"] or {}).get("score"),
+            "quality_after": (final["quality"] or {}).get("score"),
         },
         "warnings": _warnings(stats),
         "findings": rows,
@@ -243,6 +259,7 @@ def compare(folders: list[Path]) -> dict:
 
 
 def to_text(p: dict) -> str:
+    """Short plain-text summary of a progress comparison."""
     s = p["summary"]
 
     def change(v):
@@ -261,6 +278,9 @@ def to_text(p: dict) -> str:
         f"     fixed {s['fixed']} (of them consistent: {s['consistent_fixed']}), still there {s['still_there']}, "
         f"new {s['new']}  - linking findings across reviews is approximate",
     ]
+    if s.get("quality_before") is not None and s.get("quality_after") is not None:
+        out.append(f"     code quality {s['quality_before']:.0f} -> {s['quality_after']:.0f} "
+                   f"({s['quality_after'] - s['quality_before']:+.0f} points, no AI)")
     out += [f"  ! {w}" for w in p["warnings"]]
     return "\n".join(out) + "\n"
 

@@ -12,22 +12,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # plugin skill -> (standalone name, replacements). Plugin skills are called /coinflip:<name>,
-# standalone skills are plain /coinflip and /coinflip-progress.
+# standalone skills are plain /coinflip, /coinflip-progress and /coinflip-quality.
 RULES = {
     "review": ("coinflip", [
         ("name: review\n", "name: coinflip\n"),
         ("Use when the user runs /coinflip:review,", "Use when the user runs /coinflip,"),
         ("`/coinflip:progress`", "`/coinflip-progress`"),
+        ("`/coinflip:quality`", "`/coinflip-quality`"),
     ]),
     "progress": ("coinflip-progress", [
         ("name: progress\n", "name: coinflip-progress\n"),
         ("/coinflip:progress", "/coinflip-progress"),
         ("/coinflip:review", "/coinflip"),
     ]),
+    "quality": ("coinflip-quality", [
+        ("name: quality\n", "name: coinflip-quality\n"),
+        ("/coinflip:quality", "/coinflip-quality"),
+        ("/coinflip:review", "/coinflip"),
+    ]),
 }
 
 
 def render(skill: str) -> tuple[Path, str]:
+    """Turn the plugin skill into the standalone variant (rules from RULES)."""
     name, replacements = RULES[skill]
     text = (ROOT / "plugins/coinflip/skills" / skill / "SKILL.md").read_text(encoding="utf-8")
     for old, new in replacements:
@@ -36,6 +43,7 @@ def render(skill: str) -> tuple[Path, str]:
 
 
 def main(check: bool) -> int:
+    """Write the standalone skills, or with --check fail if they are out of date."""
     stale = []
     for skill in RULES:
         target, text = render(skill)

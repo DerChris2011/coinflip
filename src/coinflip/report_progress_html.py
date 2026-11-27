@@ -121,22 +121,30 @@ def _stacked(sessions: list[dict], series: list[tuple[str, str, str]], value_of,
     return f'<div class="legend">{legend}</div>' + "".join(out)
 
 
-def _line(sessions: list[dict]) -> str:
-    """Single-run coverage and stability per review (both percent, one axis 0-100)."""
+LINE_SERIES = (
+    (lambda st: st.get("single_run_coverage"), "1", "Single-run coverage"),
+    (lambda st: st.get("stability"), "2", "Stability"),
+)
+
+
+def _line(sessions: list[dict], series=LINE_SERIES, label: str = "Single-run coverage and stability per review",
+          unit: str = "%") -> str:
+    """Lines on one 0-100 axis, every point labelled; more than one series gets a legend."""
     W, H, left, right, top, bottom = 760, 260, 44, 170, 24, 44
     pad = 36  # keep the first and last point clear of the axis labels
     n = len(sessions)
     plot_h, plot_w = H - top - bottom, W - left - right
     xs = [left + pad + ((plot_w - 2 * pad) * i / (n - 1) if n > 1 else (plot_w - 2 * pad) / 2) for i in range(n)]
-    out = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="Single-run coverage and stability per review">']
+    out = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="{_e(label)}">']
     for v in (0, 25, 50, 75, 100):
         y = top + plot_h - plot_h * v / 100
         out.append(f'<line class="grid" x1="{left}" x2="{W - right}" y1="{y:.1f}" y2="{y:.1f}"/>')
-        out.append(f'<text x="{left - 8}" y="{y + 4:.1f}" text-anchor="end">{v}%</text>')
+        out.append(f'<text x="{left - 8}" y="{y + 4:.1f}" text-anchor="end">{v}{unit}</text>')
     for i, st in enumerate(sessions):
         out.append(f'<text x="{xs[i]:.1f}" y="{top + plot_h + 20}" text-anchor="middle">{_e(_label(st, i))}</text>')
-    for key, cls, name in (("single_run_coverage", "1", "Single-run coverage"), ("stability", "2", "Stability")):
-        pts = [(xs[i], st[key]) for i, st in enumerate(sessions) if st.get(key) is not None]
+    ends: list[list] = []
+    for value_of, cls, name in series:
+        pts = [(xs[i], value_of(st)) for i, st in enumerate(sessions) if value_of(st) is not None]
         if not pts:
             continue
         coords = [(x, top + plot_h - plot_h * v / 100, v) for x, v in pts]
@@ -145,14 +153,45 @@ def _line(sessions: list[dict]) -> str:
             out.append(f'<path class="s-{cls}" d="{d}"/>')
         for x, y, v in coords:
             dy = -10 if cls == "1" else 18
-            out.append(f'<circle class="m-{cls}" cx="{x:.1f}" cy="{y:.1f}" r="5"><title>{_e(name)}: {v:.0f}%</title></circle>')
-            out.append(f'<text class="val" x="{x:.1f}" y="{y + dy:.1f}" text-anchor="middle">{v:.0f}%</text>')
-        x, y, _ = coords[-1]
-        out.append(f'<text x="{x + 12:.1f}" y="{y + 4:.1f}">{_e(name)}</text>')
+            out.append(f'<circle class="m-{cls}" cx="{x:.1f}" cy="{y:.1f}" r="5"><title>{_e(name)}: {v:.0f}{unit}</title></circle>')
+            out.append(f'<text class="val" x="{x:.1f}" y="{y + dy:.1f}" text-anchor="middle">{v:.0f}{unit}</text>')
+        ends.append([coords[-1][1], coords[-1][0], name])
+    ends.sort()
+    for k in range(1, len(ends)):  # converging lines: keep the end labels apart
+        ends[k][0] = max(ends[k][0], ends[k - 1][0] + 16)
+    out += [f'<text x="{x + 12:.1f}" y="{y + 4:.1f}">{_e(name)}</text>' for y, x, name in ends]
     out.append("</svg>")
-    legend = ('<div class="legend"><span><span class="sw" style="background:var(--s1)"></span>Single-run coverage</span>'
-              '<span><span class="sw" style="background:var(--s2)"></span>Stability</span></div>')
-    return legend + "".join(out)
+    if len(series) < 2:
+        return "".join(out)
+    legend = "".join(f'<span><span class="sw" style="background:var(--s{cls})"></span>{_e(name)}</span>'
+                     for _, cls, name in series)
+    return f'<div class="legend">{legend}</div>' + "".join(out)
+
+
+def _quality(st: list[dict], s: dict) -> str:
+    """Code quality per review: one line for the overall score, a table for the six parts."""
+    from coinflip.quality import PART_NAMES
+    if not any(x.get("quality") for x in st):
+        return ""
+    chart = _line(st, ((lambda x: (x.get("quality") or {}).get("score"), "1", "Code quality"),),
+                  "Code quality score per review", unit="")
+    head = "".join(f"<th>{_e(_label(x, i))}</th>" for i, x in enumerate(st))
+    rows = []
+    for key, name in PART_NAMES.items():
+        cells = []
+        for x in st:
+            v = ((x.get("quality") or {}).get("parts") or {}).get(key)
+            cells.append("<td>-</td>" if v is None else
+                         f'<td class="cellrate" title="{_e(name)}: {v:.0f} / 100">{v:.0f}</td>')
+        rows.append(f"<tr><td>{_e(name)}</td>{''.join(cells)}</tr>")
+    overall = "".join(
+        f'<td><strong>{x["quality"]["score"]:.0f} ({_e(x["quality"]["grade"])})</strong></td>' if x.get("quality")
+        else "<td>-</td>" for x in st)
+    table = (f'<table class="data"><thead><tr><th>Part (0-100)</th>{head}</tr></thead><tbody>'
+             f'<tr><td><strong>Overall</strong></td>{overall}</tr>{"".join(rows)}</tbody></table>')
+    return ('<h2>Code quality</h2><p class="sub">Measured without AI on each reviewed version - complexity, '
+            'function size, duplication, readability, documentation and hygiene. Details per version: '
+            '<code>coinflip quality</code>.</p>' + f'<div class="card chart-card">{chart}{table}</div>')
 
 
 def _table(head: list[str], rows: list[list]) -> str:
@@ -183,6 +222,7 @@ def _delta(before, after, change) -> str:
 
 
 def render(p: dict) -> str:
+    """Self-contained HTML progress report with charts and table views."""
     s, st = p["summary"], p["sessions"]
     n = len(st)
     head = (f'<header><p class="eyebrow">coinflip progress</p><h1>{_e(p["project"])}</h1>'
@@ -204,7 +244,11 @@ def render(p: dict) -> str:
              f'<div class="tile"><div class="v">{s["fixed"]}</div><div class="l">fixed (gone in the last review)</div></div>'
              f'<div class="tile"><div class="v">{s["still_there"]}</div><div class="l">still there</div></div>'
              f'<div class="tile"><div class="v">{s["new"]}</div><div class="l">new</div></div>'
-             "</div>")
+             + (f'<div class="tile"><div class="v">{s["quality_before"]:.0f} → {s["quality_after"]:.0f} '
+                f'<span class="delta {"good" if s["quality_after"] > s["quality_before"] else "bad" if s["quality_after"] < s["quality_before"] else ""}">'
+                f'({s["quality_after"] - s["quality_before"]:+.0f})</span></div><div class="l">code quality (no AI)</div></div>'
+                if s.get("quality_before") is not None and s.get("quality_after") is not None else "")
+             + "</div>")
     warnings = "".join(f'<div class="warn-box">{_e(w)}</div>' for w in p["warnings"])
 
     conf_series = [(k, f"f-{c}", name) for k, c, name in CONF]
@@ -249,6 +293,7 @@ def render(p: dict) -> str:
         + '<h2>How reliable was each review?</h2><p class="sub">Single-run coverage: what one run alone showed of '
           'everything found. Stability: how much two runs agreed.</p>'
         + f'<div class="card chart-card">{line}{line_table}</div>'
+        + _quality(st, s)
         + '<h2>What happened to each finding</h2><p class="sub">Cells show in how many runs of that review a finding '
           'came back. Findings are linked across reviews by file, line and wording - after code changes this is a '
           'best guess, not an exact match.</p>' + fates

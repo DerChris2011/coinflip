@@ -51,6 +51,7 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 - [Canaries: how good is the reviewer on your code?](#canaries-how-good-is-the-reviewer-on-your-code)
 - [The HTML report](#the-html-report)
 - [Did the fixes work? Progress reports](#did-the-fixes-work-progress-reports)
+- [Code quality without AI](#code-quality-without-ai)
 - [Without Claude Code: the command line](#without-claude-code-the-command-line)
 - [Reviewers](#reviewers)
 - [Benchmark and leaderboard](#benchmark-and-leaderboard)
@@ -71,13 +72,15 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 | 🧩 **One command in Claude Code** | `/coinflip:review` picks the scope, runs everything, then opens each finding in your code and judges it. |
 | 🟦 **The coin-flip matrix** | A self-contained HTML report: one row per finding, one dot per run. Easy to share. |
 | 📈 **Progress reports** | Review, fix, review again - `/coinflip:progress` shows with charts how the findings went down. |
+| 🧹 **Code quality without AI** | Complexity, function size, duplication, readability, documentation and commented-out code as one score - same code, same number, every time. |
 | 🏁 **Benchmark** | 15 planted bugs plus a bug-free twin, to compare reviewers head to head. |
 
 ## What it does not do
 
 coinflip **never changes your files**. Every review runs on a temporary copy that is deleted
 afterwards, and nothing is written into your project. It is not a linter or a security scanner
-of its own: it measures - and improves - the AI reviewer you already use. The Claude Code skill
+of its own: it measures - and improves - the AI reviewer you already use. The code quality score
+next to it is deliberately simple and deterministic: a trend line, not a verdict. The Claude Code skill
 fixes findings only when you ask it to.
 
 ## Quick start in Claude Code
@@ -119,6 +122,7 @@ fix, what is worth a look and what is probably noise.
 - *"Run coinflip on src/payments with 10 runs."*
 - *"Measure how good the reviewer is on this project, with 8 canaries."*
 - *"Open the coinflip report."*
+- *"How clean is my code?"* - runs `/coinflip:quality`, takes seconds, no AI runs.
 
 To update later, in a shell: `claude plugin marketplace update coinflip` and
 `claude plugin update coinflip@coinflip`, then restart Claude Code. `claude plugin list` shows
@@ -214,6 +218,49 @@ coinflip progress --last 2        # the last two
 Counts per review are exact. Following one finding from review to review is a best guess -
 lines move when code changes and every run words its findings differently - and the report
 says so. Compare reviews with the same scope and number of runs for a fair picture.
+Every review also records the [code quality score](#code-quality-without-ai), so the report shows
+whether the fixes made the code cleaner too - not just quieter.
+
+## Code quality without AI
+
+An AI review wobbles. A measurement should not. Every coinflip review also scores the code with
+fixed rules - no AI, no tokens, a few seconds - and you can run it on its own:
+
+```text
+/coinflip:quality
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/quality-dark.png">
+  <img alt="Code quality of LightBurn MCP: 74 of 100, grade C, documentation is the weakest part" src="docs/quality-light.png" width="860">
+</picture>
+
+<sub>[LightBurn MCP](https://github.com/DerChris2011/Lightburn_MCP) measured with `coinflip quality --open`.</sub>
+
+| Part | 100 means | Counts against it |
+|---|---|---|
+| **Complexity** | all function code has a cyclomatic complexity of 10 or less | branches upon branches |
+| **Function size** | all function code sits in functions of 50 lines or less | functions nobody reads in one go |
+| **Duplication** | no copy-pasted blocks (6+ lines) | 25 % duplicated lines = 0 |
+| **Readability** | nesting ≤ 4, ≤ 5 parameters, lines ≤ 120 chars, clear names | `data2`, `tmp`, `handleData`, cryptic one-letter names |
+| **Documentation** | every public function has a docstring / doc comment | undocumented public API |
+| **Hygiene** | nothing left lying around | commented-out code, `console.log` / `breakpoint()` / `debugger`, empty `catch` / `except: pass`, suppressed warnings, `any`, TODO/FIXME (half weight) |
+
+The score is the average of the six parts, graded A (≥ 90) to E. Test files are not held to
+these rules; they only count for the test-to-code ratio. Python, JavaScript/TypeScript, Java,
+C#, Go, Rust, C/C++, PHP, Kotlin, Swift and more are supported (complexity via
+[lizard](https://github.com/terryyin/lizard)).
+
+```bash
+coinflip quality                      # the whole project, with the worst spots
+coinflip quality --diff main          # only the files you changed
+coinflip quality --open               # HTML page
+coinflip quality --fail-under 70      # CI gate: exit code 1 below 70
+```
+
+It is a trend line, not a verdict: a 74 is not "bad code", but 74 → 81 after a clean-up is real.
+Commented-out code and documentation are detected with simple, documented heuristics, so the
+lists of offenders are meant to be skimmed, not obeyed blindly.
 
 ## Without Claude Code: the command line
 
@@ -248,6 +295,7 @@ coinflip review [PATH]               Review a project N times (default 5)
 coinflip report [SESSION] [-f text|markdown|json|html] [-o FILE] [--open]
 coinflip sessions [PATH]             the review sessions of a project, numbered
 coinflip progress [N ...] [--last N] [-f html|text|json] [-o FILE] [--open]
+coinflip quality [PATH] [--diff REF] [--include GLOB] [-f text|markdown|json|html] [--fail-under N]
 coinflip bench run -r SPEC ...       run the benchmark
 coinflip compare [-f markdown]       leaderboard of all benchmark sessions
 coinflip bench list | show NAME | export NAME DEST
@@ -294,7 +342,9 @@ flowchart LR
     R1 --> M["Match findings<br/>across runs"]
     R2 --> M
     RN --> M
+    P -- "fixed rules, no AI" --> Q["Code quality score"]
     M --> S["Confidence per finding<br/>canary hit rate per kind"]
+    Q --> O
     S --> O["Terminal · HTML · JSON · Markdown"]
 ```
 
@@ -304,6 +354,8 @@ flowchart LR
   title). Agentic CLIs read the copy themselves, so large projects work.
 - **Matching** groups findings from different runs that point at the same spot. A finding counts
   for a canary only within 2 lines of it.
+- **Code quality** is measured on your original files (before any canary), stored with the
+  session and shown in the report.
 - **Sessions** keep the exact prompt and every raw answer, so `coinflip report` can re-score
   without paying for the runs again.
 
@@ -353,7 +405,7 @@ uv run --extra dev pytest          # tests run against a scripted fake reviewer
 uv run coinflip review --help
 ```
 
-Python 3.11+, no runtime dependencies. CI runs on Windows, macOS and Linux. The Claude Code
+Python 3.11+, one runtime dependency ([lizard](https://github.com/terryyin/lizard) for complexity). CI runs on Windows, macOS and Linux. The Claude Code
 plugin lives in [`plugins/coinflip`](plugins/coinflip), the marketplace in
 [`.claude-plugin`](.claude-plugin). Issues and pull requests are welcome.
 

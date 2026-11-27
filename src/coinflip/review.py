@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from coinflip import canary, prompt, workspace
+from coinflip import canary, prompt, quality, workspace
 
 DEFAULT_MAX_INLINE_CHARS = 300_000
 MAX_DIFF_CHARS = 200_000
@@ -55,6 +55,7 @@ def _plant(root: Path, plan_copy: Path, scope: list[str], count: int, seed: int,
 def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, canaries: int = 0,
             seed: int = 1, inline: bool = False, max_chars: int = DEFAULT_MAX_INLINE_CHARS,
             avoid: set[tuple[str, int]] | None = None) -> Plan:
+    """Copy the project, plant canaries if asked, measure quality and build the prompt."""
     root = root.resolve()
     if not root.is_dir():
         raise workspace.WorkspaceError(f"not a folder: {root}")
@@ -83,6 +84,10 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
         raise
 
     commit, dirty = workspace.git_state(root)
+    try:  # measured on the original files, before any canary - never allowed to break a review
+        code_quality = quality.analyse(root, workspace.scope(files, includes))
+    except Exception as exc:
+        code_quality = {"score": None, "error": str(exc)}
     meta = {
         "mode": "review",
         "project": root.name,
@@ -97,5 +102,6 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
         "canaries": planted,
         "canary_seed": seed if canaries else None,
         "canary_avoided_spots": len(avoid or ()),
+        "quality": code_quality,
     }
     return Plan(meta=meta, prompt=text, copy=copy, scope=scope)

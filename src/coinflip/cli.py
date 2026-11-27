@@ -2,6 +2,7 @@
 
   coinflip review [PATH]      review your own project N times, confidence per finding
   coinflip bench run          measure reviewers on the built-in benchmark (leaderboard)
+  coinflip quality [PATH]     deterministic code quality score (no AI)
   coinflip report / compare   re-score stored sessions / leaderboard
 """
 
@@ -14,8 +15,8 @@ from pathlib import Path
 
 from datetime import datetime
 
-from coinflip import (__version__, benchmark, progress, prompt, report, report_html, report_progress_html, review,
-                      reviewers, session, workspace)
+from coinflip import (__version__, benchmark, progress, prompt, quality, report, report_html, report_progress_html,
+                      report_quality, review, reviewers, session, workspace)
 from coinflip.findings import match, parse_answer
 
 RENDER = {"text": report.to_text, "markdown": report.to_markdown, "json": report.to_json}
@@ -89,6 +90,17 @@ def _parser() -> argparse.ArgumentParser:
     prog.add_argument("-f", "--format", choices=("html", "text", "json"), default="html")
     prog.add_argument("-o", "--output", type=Path, help="where to write the report (default: ~/.coinflip/progress/)")
     prog.add_argument("--open", action="store_true", help="open the HTML report in the browser")
+
+    qual = sub.add_parser("quality", help="code quality score without AI: complexity, size, duplication, "
+                                          "readability, documentation, hygiene")
+    qual.add_argument("path", nargs="?", type=Path, default=Path("."), help="project folder (default: .)")
+    qual.add_argument("--include", action="append", default=[], metavar="GLOB", help="files to measure (repeatable)")
+    qual.add_argument("--diff", metavar="REF", help="only measure files changed against a git ref")
+    qual.add_argument("-f", "--format", choices=("text", "markdown", "json", "html"), default="text")
+    qual.add_argument("-o", "--output", type=Path, help="write the report to this file")
+    qual.add_argument("--open", action="store_true", help="open the HTML report in the browser")
+    qual.add_argument("--fail-under", type=float, metavar="SCORE",
+                      help="exit with code 1 if the score is below SCORE (for CI)")
 
     sub.add_parser("reviewers", help="show which reviewer CLIs are installed")
     return p
@@ -366,6 +378,39 @@ def _cmd_progress(args) -> int:
     return 0
 
 
+def _cmd_quality(args) -> int:
+    try:
+        result = quality.measure(args.path, tuple(args.include), args.diff)
+    except workspace.WorkspaceError as exc:
+        _err(str(exc))
+        return EXIT_USAGE
+    name = args.path.resolve().name + (f" (changes vs {args.diff})" if args.diff else "")
+    renderers = {
+        "text": lambda: report_quality.to_text(result, name),
+        "markdown": lambda: report_quality.to_markdown(result, name),
+        "json": lambda: report_quality.to_json(result),
+        "html": lambda: report_quality.render(result, name, __version__),
+    }
+    text = renderers[args.format]()
+    target = args.output
+    if target is None and args.format == "html":
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        target = session.home().parent / "quality" / f"{stamp}-{args.path.resolve().name}.html"
+    if target is None:
+        sys.stdout.write(text)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        sys.stdout.write(report_quality.to_text(result, name) if args.format == "html" else "")
+        print(f"  quality report: {target}", file=sys.stderr)
+        if args.open and args.format == "html":
+            _open(target)
+    if args.fail_under is not None and (result["score"] is None or result["score"] < args.fail_under):
+        _err(f"code quality {result['score'] if result['score'] is not None else 'n/a'} is below {args.fail_under:g}")
+        return 1
+    return 0
+
+
 def _cmd_reviewers() -> int:
     for name in reviewers.PRESET_NAMES:
         spec = "ollama:<model>" if name == "ollama" else name
@@ -378,6 +423,7 @@ def _cmd_reviewers() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Entry point of the `coinflip` command; returns the exit code."""
     args = _parser().parse_args(argv)
     handlers = {
         "review": lambda: _cmd_review(args),
@@ -386,6 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         "compare": lambda: _cmd_compare(args),
         "sessions": lambda: _cmd_sessions(args),
         "progress": lambda: _cmd_progress(args),
+        "quality": lambda: _cmd_quality(args),
         "reviewers": _cmd_reviewers,
     }
     return handlers[args.command]()

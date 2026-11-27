@@ -133,6 +133,7 @@ def build(name: str) -> tuple[Benchmark, dict[str, str], dict[str, str]]:
 
 
 def export(files: dict[str, str], dest: Path) -> None:
+    """Write the buggy or clean variant of a benchmark into a folder."""
     if dest.exists():
         shutil.rmtree(dest)
     for rel, text in files.items():
