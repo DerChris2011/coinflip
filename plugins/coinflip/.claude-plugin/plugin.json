@@ -1,0 +1,13 @@
+{
+  "name": "coinflip",
+  "description": "Review your code several times with Claude and get a confidence score for every finding: what is consistent, what is a coin flip.",
+  "version": "0.2.1",
+  "author": {
+    "name": "Christoph Fandrich",
+    "url": "https://github.com/DerChris2011"
+  },
+  "homepage": "https://github.com/DerChris2011/coinflip",
+  "repository": "https://github.com/DerChris2011/coinflip",
+  "license": "MIT",
+  "keywords": ["code-review", "reliability", "ai-review", "quality"]
+}

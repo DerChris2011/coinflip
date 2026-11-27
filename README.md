@@ -9,7 +9,7 @@ so whether you hear about them is luck.
 coinflip runs your AI reviewer several times on your project and tells you which is which:
 
 ```text
-coinflip 0.2.0  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude  |  5 runs
+coinflip 0.2.1  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude  |  5 runs
 
   >> 11 distinct findings - 4 consistent, 5 coin flips, 2 seen once
      a single run showed on average 52% of them
@@ -33,7 +33,24 @@ coinflip 0.2.0  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude 
 - **A better review, not just a number.** Every finding gets a confidence score, so you know
   what to fix right away and what needs a second look.
 
-## Install
+## The easy way: inside Claude Code
+
+Three commands in Claude Code, nothing else to set up:
+
+```text
+/plugin marketplace add DerChris2011/coinflip
+/plugin install coinflip@coinflip
+/coinflip:review
+```
+
+The skill picks what to review (your uncommitted changes, your branch, or the whole project),
+runs the reviews in the background, then opens every consistent and coin-flip finding in your
+code and tells you what to fix, what is worth a look and what is probably noise.
+It only needs [uv](https://docs.astral.sh/uv/) - and asks before installing it.
+
+You can also just say: *"review my changes with coinflip, 10 runs, with canaries"*.
+
+## Install the command-line tool
 
 You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and at least one AI CLI.
 

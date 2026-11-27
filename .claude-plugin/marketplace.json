@@ -1,0 +1,15 @@
+{
+  "name": "coinflip",
+  "description": "Is your AI code review a coin flip? Run it several times and keep what is consistent.",
+  "owner": {
+    "name": "Christoph Fandrich",
+    "url": "https://github.com/DerChris2011"
+  },
+  "plugins": [
+    {
+      "name": "coinflip",
+      "source": "./plugins/coinflip",
+      "description": "Review your code several times with Claude and get a confidence score for every finding."
+    }
+  ]
+}

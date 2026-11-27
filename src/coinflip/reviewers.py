@@ -98,6 +98,9 @@ def ask(reviewer: Reviewer, prompt: str, timeout: float, cwd: str | None = None)
     if executable is None:
         raise ReviewerError(f"'{reviewer.argv[0]}' is not installed or not on PATH")
     started = time.monotonic()
+    # When coinflip itself runs inside Claude Code (e.g. via the plugin skill), the nested
+    # `claude -p` must not believe it is part of that interactive session.
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
     with tempfile.TemporaryDirectory(prefix="coinflip-") as empty:
         try:
             proc = subprocess.run(
@@ -108,6 +111,7 @@ def ask(reviewer: Reviewer, prompt: str, timeout: float, cwd: str | None = None)
                 encoding="utf-8",
                 errors="replace",
                 cwd=cwd or empty,
+                env=env,
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:
