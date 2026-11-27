@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +28,19 @@ from coinflip import __version__, benchmark, metrics, prompt, reviewers
 from coinflip.findings import match, parse_answer
 
 Progress = Callable[[str, int, int, reviewers.Answer], None]
+HEARTBEAT_SECONDS = 30
+
+
+def _heartbeat(label: str, running: dict, lock: threading.Lock, stop: threading.Event) -> None:
+    """Show that long runs are alive - an agentic review can take several minutes."""
+    while not stop.wait(HEARTBEAT_SECONDS):
+        with lock:
+            active = sorted(running.items())
+        if active:
+            now = time.monotonic()
+            parts = [f"{variant} run {index} ({int(now - t) // 60}:{int(now - t) % 60:02d})"
+                     for (variant, index), t in active]
+            print(f"  [{label}] still working: {', '.join(parts)}", file=sys.stderr, flush=True)
 
 
 def home() -> Path:
@@ -66,9 +81,16 @@ def collect(
         meta.setdefault("prompts", {})[variant] = prompt.fingerprint(text)
     _write_json(session / "meta.json", meta)
     lock = threading.Lock()
+    running: dict[tuple[str, int], float] = {}
 
     def one(variant: str, text: str, index: int) -> None:
-        answer = reviewers.ask(reviewer, text, timeout, str(cwd) if cwd else None)
+        with lock:
+            running[(variant, index)] = time.monotonic()
+        try:
+            answer = reviewers.ask(reviewer, text, timeout, str(cwd) if cwd else None)
+        finally:
+            with lock:
+                running.pop((variant, index), None)
         name = f"{variant}-{index:02d}.txt"
         (session / name).write_text(answer.text, encoding="utf-8")
         with lock:
@@ -81,9 +103,15 @@ def collect(
                 progress(variant, index, sum(1 for r in meta["runs"] if r["variant"] == variant), answer)
 
     tasks = [(variant, text, i) for variant, text, count in jobs_spec for i in range(1, count + 1)]
-    with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
-        for future in [pool.submit(one, *t) for t in tasks]:
-            future.result()
+    stop = threading.Event()
+    beat = threading.Thread(target=_heartbeat, args=(reviewer.spec, running, lock, stop), daemon=True)
+    beat.start()
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
+            for future in [pool.submit(one, *t) for t in tasks]:
+                future.result()
+    finally:
+        stop.set()
 
 
 def load_meta(session: Path) -> dict:

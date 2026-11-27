@@ -163,3 +163,11 @@ def test_changed_lines_and_patch_diff(tmp_path):
     assert workspace.changed_lines(tmp_path, diff, ["m.py"]) == {"m.py": {2, 3}}
     patched = workspace.patch_diff(diff, {("m.py", 3): "c = 5", ("m.py", 4): "d = 6"})
     assert "+c = 5" in patched and " d = 6" in patched and "-b = 2" in patched
+
+
+def test_heartbeat_shows_long_runs(fake, project, monkeypatch, capsys):
+    from coinflip import session
+    monkeypatch.setattr(session, "HEARTBEAT_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_SLEEP", "0.7")
+    assert main(["review", str(project), "-r", fake, "-n", "1"]) == 0
+    assert "still working: review run 1 (0:00)" in capsys.readouterr().err

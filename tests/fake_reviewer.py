@@ -20,6 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from coinflip.benchmark import build  # noqa: E402
 
 prompt = sys.stdin.read()
+if os.environ.get("FAKE_SLEEP"):
+    import time
+    time.sleep(float(os.environ["FAKE_SLEEP"]))
 mode = os.environ.get("FAKE_MODE", "ok")
 if mode == "fail":
     print("rate limit exceeded", file=sys.stderr)

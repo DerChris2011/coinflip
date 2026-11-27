@@ -26,7 +26,7 @@ def _common(p: argparse.ArgumentParser, runs: int) -> None:
     p.add_argument("-r", "--reviewer", action="append", metavar="SPEC",
                    help="claude, codex, gemini, ollama:<model>, cmd:<command> (repeatable)")
     p.add_argument("-n", "--runs", type=int, default=runs, help=f"runs per reviewer (default {runs})")
-    p.add_argument("--timeout", type=float, default=900, help="seconds per run (default 900)")
+    p.add_argument("--timeout", type=float, default=600, help="seconds per run before it is given up (default 600)")
     p.add_argument("-j", "--parallel", type=int, default=1, help="runs in parallel (default 1)")
     p.add_argument("-o", "--out", type=Path, help="where sessions are stored (default ~/.coinflip/sessions)")
     p.add_argument("-f", "--format", choices=RENDER, default="text")
