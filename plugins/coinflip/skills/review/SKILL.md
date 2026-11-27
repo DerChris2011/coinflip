@@ -55,7 +55,7 @@ Run from the project root. It takes several minutes (each run is a full review),
 **in the background** and check its output until it has finished. Never use a short timeout.
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@b6d530b5255cae7781ca82b2ac21ce01c733f2fb coinflip review <scope options> -n 5 -j 3 -r claude
+uvx --from git+https://github.com/DerChris2011/coinflip@e06c98f29a4c6004f4965231824a9f8b39c3a7c7 coinflip review <scope options> -n 5 -j 3 -r claude
 ```
 
 `-j 3` runs three reviews in parallel. Tell the user roughly how long to expect (about
@@ -71,7 +71,7 @@ show the user the message and stop instead of retrying in a loop.
 When it has finished, get the structured result of the latest session:
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@b6d530b5255cae7781ca82b2ac21ce01c733f2fb coinflip report -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@e06c98f29a4c6004f4965231824a9f8b39c3a7c7 coinflip report -f json
 ```
 
 Key fields: `distinct_findings`, `consistent`, `coin_flips`, `once`, `single_run_coverage`

@@ -9,7 +9,7 @@ so whether you hear about them is luck.
 coinflip runs your AI reviewer several times on your project and tells you which is which:
 
 ```text
-coinflip 0.2.1  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude  |  5 runs
+coinflip 0.2.2  |  review: my-shop (diff vs main, 6 files)  |  reviewer: claude  |  5 runs
 
   >> 11 distinct findings - 4 consistent, 5 coin flips, 2 seen once
      a single run showed on average 52% of them

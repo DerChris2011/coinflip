@@ -1,7 +1,7 @@
 {
   "name": "coinflip",
   "description": "Review your code several times with Claude and get a confidence score for every finding: what is consistent, what is a coin flip.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": {
     "name": "Christoph Fandrich",
     "url": "https://github.com/DerChris2011"
