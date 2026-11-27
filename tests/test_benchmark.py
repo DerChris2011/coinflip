@@ -63,11 +63,19 @@ def test_export(tmp_path):
     assert not list((tmp_path / "out").rglob("bugs.toml"))
 
 
-def test_standalone_skill_matches_plugin_skill():
+def test_standalone_skills_match_plugin_skills():
+    import subprocess
+    import sys
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
-    plugin = (root / "plugins/coinflip/skills/review/SKILL.md").read_text(encoding="utf-8")
-    standalone = (root / "standalone-skill/coinflip/SKILL.md").read_text(encoding="utf-8")
-    expected = plugin.replace("name: review\n", "name: coinflip\n", 1).replace(
-        "Use when the user runs /coinflip:review,", "Use when the user runs /coinflip,", 1)
-    assert standalone == expected, "regenerate standalone-skill/coinflip/SKILL.md from the plugin skill"
+    proc = subprocess.run([sys.executable, str(root / "scripts" / "sync_skills.py"), "--check"],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_progress_skill_only_runs_when_asked():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    for path in ("plugins/coinflip/skills/progress/SKILL.md", "standalone-skill/coinflip-progress/SKILL.md"):
+        head = (root / path).read_text(encoding="utf-8").split("---")[1]
+        assert "disable-model-invocation: true" in head

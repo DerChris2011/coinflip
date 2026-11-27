@@ -82,10 +82,13 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
         shutil.rmtree(copy, ignore_errors=True)
         raise
 
+    commit, dirty = workspace.git_state(root)
     meta = {
         "mode": "review",
         "project": root.name,
         "project_path": str(root),
+        "commit": commit,
+        "dirty": dirty,
         "diff": ref,
         "includes": list(includes),
         "inline": inline,

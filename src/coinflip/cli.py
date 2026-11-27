@@ -12,7 +12,10 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from coinflip import __version__, benchmark, prompt, report, report_html, review, reviewers, session, workspace
+from datetime import datetime
+
+from coinflip import (__version__, benchmark, progress, prompt, report, report_html, report_progress_html, review,
+                      reviewers, session, workspace)
 from coinflip.findings import match, parse_answer
 
 RENDER = {"text": report.to_text, "markdown": report.to_markdown, "json": report.to_json}
@@ -73,6 +76,19 @@ def _parser() -> argparse.ArgumentParser:
     cmp_ = sub.add_parser("compare", help="benchmark leaderboard across stored sessions")
     cmp_.add_argument("sessions", nargs="*", type=Path, help="session folders or parents (default: all)")
     cmp_.add_argument("-f", "--format", choices=("text", "markdown"), default="text")
+
+    ses = sub.add_parser("sessions", help="list the review sessions of a project")
+    ses.add_argument("path", nargs="?", type=Path, default=Path("."), help="project folder (default: .)")
+    ses.add_argument("-f", "--format", choices=("text", "json"), default="text")
+
+    prog = sub.add_parser("progress", help="compare review sessions of a project over time (review -> fix -> review)")
+    prog.add_argument("sessions", nargs="*", help="session numbers from `coinflip sessions`, or session folders "
+                                                 "(default: all reviews of the project)")
+    prog.add_argument("--project", type=Path, default=Path("."), help="project folder (default: .)")
+    prog.add_argument("--last", type=int, metavar="N", help="compare the last N reviews")
+    prog.add_argument("-f", "--format", choices=("html", "text", "json"), default="html")
+    prog.add_argument("-o", "--output", type=Path, help="where to write the report (default: ~/.coinflip/progress/)")
+    prog.add_argument("--open", action="store_true", help="open the HTML report in the browser")
 
     sub.add_parser("reviewers", help="show which reviewer CLIs are installed")
     return p
@@ -280,6 +296,76 @@ def _cmd_compare(args) -> int:
     return 0
 
 
+def _cmd_sessions(args) -> int:
+    import json
+    folders = progress.project_sessions(session.home(), args.path)
+    rows = [progress.describe(f, i) for i, f in enumerate(folders, start=1)]
+    if args.format == "json":
+        sys.stdout.write(json.dumps({"project": args.path.resolve().name, "sessions": rows}, indent=2) + "\n")
+        return 0
+    if not rows:
+        print(f"no review sessions for {args.path.resolve().name} yet - run `coinflip review` first")
+        return 0
+    print(f"review sessions of {args.path.resolve().name}:\n")
+    print(f"  {'#':>2}  {'started':<16}  {'commit':<10}  {'scope':<16}  runs  findings  consistent  coin flips  once")
+    for r in rows:
+        commit = f"{r['commit']}{'*' if r['dirty'] else ''}" if r["commit"] else "-"
+        canary = f"  +{r['canaries']} canaries" if r["canaries"] else ""
+        print(f"  {r['number']:>2}  {progress.local_time(r['started']):<16}  {commit:<10}  {r['scope']:<16}  "
+              f"{r['runs']:>4}  {r['distinct_findings']:>8}  {r['consistent']:>10}  {r['coin_flips']:>10}  {r['once']:>4}{canary}")
+    if len(rows) > 1:
+        print("\n  compare them with: coinflip progress 1 2  (or --last 2, or no numbers for all)")
+    return 0
+
+
+def _pick_sessions(args) -> list[Path]:
+    available = progress.project_sessions(session.home(), args.project)
+    if not args.sessions:
+        return available[-args.last:] if args.last else available
+    picked = []
+    for item in args.sessions:
+        if item.isdigit():
+            number = int(item)
+            if not 1 <= number <= len(available):
+                raise progress.ProgressError(f"there is no review #{number} (this project has {len(available)})")
+            picked.append(available[number - 1])
+        else:
+            path = Path(item)
+            picked.append(path if path.is_dir() else session.home() / item)
+    return picked
+
+
+def _cmd_progress(args) -> int:
+    try:
+        folders = _pick_sessions(args)
+        result = progress.compare(folders)
+    except (progress.ProgressError, FileNotFoundError) as exc:
+        _err(str(exc))
+        if "at least 2" in str(exc):
+            _err("run a review, fix what it found, then review again - `coinflip sessions` lists what is there")
+        return EXIT_USAGE
+    if args.format == "json":
+        text = progress.to_json(result)
+    elif args.format == "text":
+        text = progress.to_text(result)
+    else:
+        text = report_progress_html.render(result)
+    target = args.output
+    if target is None and args.format == "html":
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        target = session.home().parent / "progress" / f"{stamp}-{result['project']}.html"
+    if target is None:
+        sys.stdout.write(text)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        sys.stdout.write(progress.to_text(result))
+        print(f"  progress report: {target}", file=sys.stderr)
+        if args.open and args.format == "html":
+            _open(target)
+    return 0
+
+
 def _cmd_reviewers() -> int:
     for name in reviewers.PRESET_NAMES:
         spec = "ollama:<model>" if name == "ollama" else name
@@ -298,6 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         "bench": lambda: _cmd_bench(args),
         "report": lambda: _cmd_report(args),
         "compare": lambda: _cmd_compare(args),
+        "sessions": lambda: _cmd_sessions(args),
+        "progress": lambda: _cmd_progress(args),
         "reviewers": _cmd_reviewers,
     }
     return handlers[args.command]()

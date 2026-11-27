@@ -119,6 +119,9 @@ If the user wants to keep or share it, ask where to save it. Do not write it int
 unasked. To save a copy: `coinflip report -f html -o <path>/coinflip-report.html`.
 For a pull request or issue: `coinflip report -f markdown`.
 
+If this project already had earlier coinflip reviews, mention once that `/coinflip:progress`
+compares them in a report with charts - do not build that report yourself.
+
 Then offer one of these, whichever fits:
 - fix the confirmed findings (ask before editing any file)
 - measure the reviewer on this code with `--canary 8`

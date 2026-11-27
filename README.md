@@ -50,6 +50,7 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 - [Reading the result](#reading-the-result)
 - [Canaries: how good is the reviewer on your code?](#canaries-how-good-is-the-reviewer-on-your-code)
 - [The HTML report](#the-html-report)
+- [Did the fixes work? Progress reports](#did-the-fixes-work-progress-reports)
 - [Without Claude Code: the command line](#without-claude-code-the-command-line)
 - [Reviewers](#reviewers)
 - [Benchmark and leaderboard](#benchmark-and-leaderboard)
@@ -69,6 +70,7 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 | 🔀 **Reviews what you are working on** | Your uncommitted changes, your branch against `main`, or the whole project. |
 | 🧩 **One command in Claude Code** | `/coinflip:review` picks the scope, runs everything, then opens each finding in your code and judges it. |
 | 🟦 **The coin-flip matrix** | A self-contained HTML report: one row per finding, one dot per run. Easy to share. |
+| 📈 **Progress reports** | Review, fix, review again - `/coinflip:progress` shows with charts how the findings went down. |
 | 🏁 **Benchmark** | 15 planted bugs plus a bug-free twin, to compare reviewers head to head. |
 
 ## What it does not do
@@ -182,6 +184,37 @@ coinflip report -f html -o coinflip-report.html   # save a copy to share
 coinflip report -f markdown                       # a table for a pull request or issue
 ```
 
+## Did the fixes work? Progress reports
+
+Review, fix what it found, review again - then compare:
+
+```text
+/coinflip:progress
+```
+
+The skill lists the reviews of the project (with date, commit and scope), asks which ones to
+compare - all, the last two, first and last, or specific ones - and opens a report with charts:
+findings per review by confidence and by severity, how reliable each review was, what happened
+to each finding (fixed, still there, new) and findings per file. It only runs when you call it,
+and only when the project has at least two reviews.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/progress-dark.png">
+  <img alt="Progress report: consistent findings went from 3 to 0 over three reviews" src="docs/progress-light.png" width="860">
+</picture>
+
+<sub>Example from a demo project: three reviews, two rounds of fixes.</sub>
+
+```bash
+coinflip sessions                 # the reviews of this project, numbered
+coinflip progress 1 3 --open      # compare review 1 and 3
+coinflip progress --last 2        # the last two
+```
+
+Counts per review are exact. Following one finding from review to review is a best guess -
+lines move when code changes and every run words its findings differently - and the report
+says so. Compare reviews with the same scope and number of runs for a fair picture.
+
 ## Without Claude Code: the command line
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/):
@@ -213,6 +246,8 @@ coinflip review [PATH]               Review a project N times (default 5)
     -n RUNS  -j PARALLEL             number of runs, runs at the same time
     --open                           open the HTML report when done
 coinflip report [SESSION] [-f text|markdown|json|html] [-o FILE] [--open]
+coinflip sessions [PATH]             the review sessions of a project, numbered
+coinflip progress [N ...] [--last N] [-f html|text|json] [-o FILE] [--open]
 coinflip bench run -r SPEC ...       run the benchmark
 coinflip compare [-f markdown]       leaderboard of all benchmark sessions
 coinflip bench list | show NAME | export NAME DEST

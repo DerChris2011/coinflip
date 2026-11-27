@@ -40,6 +40,14 @@ def is_git(root: Path) -> bool:
     return _git(root, "rev-parse", "--is-inside-work-tree") is not None
 
 
+def git_state(root: Path) -> tuple[str | None, bool | None]:
+    """(short commit, has uncommitted changes) - so reviews can be told apart before/after a fix."""
+    commit = _git(root, "rev-parse", "--short", "HEAD")
+    if commit is None:
+        return None, None
+    return commit.strip(), bool((_git(root, "status", "--porcelain") or "").strip())
+
+
 def list_files(root: Path) -> list[str]:
     """All files of the project: git-tracked + untracked-not-ignored, or a plain walk."""
     out = _git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")

@@ -188,7 +188,7 @@ def _project_reader(root: str | None):
 def score(session: Path) -> dict:
     meta = load_meta(session)
     header = {k: meta.get(k) for k in ("coinflip", "reviewer", "started", "benchmark", "project", "diff",
-                                       "scope_files")}
+                                       "scope_files", "commit", "dirty")}
     header["session"] = session.name
     if meta["mode"] == "benchmark":
         bench, buggy_files, _ = benchmark.build(meta["benchmark_name"])
