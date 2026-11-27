@@ -112,3 +112,12 @@ def test_summarize_review_separates_canaries():
     c = s["canary"]
     assert c["planted"] == 1 and c["coin_flips"] == 1 and c["recall_all_runs"] == 100.0
     assert c["canaries"][0]["hits"] == 2
+
+
+def test_clusters_do_not_chain_and_never_merge_one_runs_findings():
+    def run(i, *lines):
+        return Run("review", i, 1.0, None, parsed=True, findings=[Finding("m.py", n, "", f"t{n}") for n in lines])
+    # every run reports three distinct problems 3 lines apart
+    s = summarize_review([run(1, 12, 15, 18), run(2, 12, 15, 18), run(3, 13, 15, 18)], [])
+    assert s["distinct_findings"] == 3
+    assert [f["hits"] for f in s["findings"]] == [3, 3, 3]

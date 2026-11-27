@@ -135,21 +135,31 @@ SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 
 def _cluster(runs: list[Run]) -> list[dict]:
-    """Group findings from different runs that point at (nearly) the same place."""
+    """Group findings from different runs that point at (nearly) the same place.
+
+    A finding joins the nearest group in the same file whose anchor (first line) is at
+    most CLUSTER_LINES away and that has no finding from the same run yet. Two findings
+    of one run are therefore never merged - the reviewer itself saw two problems - and
+    groups do not chain: line 12, 15 and 18 stay apart unless they really coincide.
+    """
     items = sorted(
         ((f.file, f.line, r.index, f) for r in runs for f in r.findings),
         key=lambda t: (t[0], t[1], t[2]),
     )
     clusters: list[dict] = []
+    by_file: dict[str, list[dict]] = {}
     for file, line, run_index, finding in items:
-        last = clusters[-1] if clusters else None
-        if last and last["file"] == file and line - last["last_line"] <= CLUSTER_LINES:
-            last["runs"].add(run_index)
-            last["last_line"] = line
-            last["severities"].append(finding.severity)
+        candidates = [c for c in by_file.get(file, [])
+                      if abs(c["line"] - line) <= CLUSTER_LINES and run_index not in c["runs"]]
+        if candidates:
+            target = min(candidates, key=lambda c: (abs(c["line"] - line), c["line"]))
+            target["runs"].add(run_index)
+            target["severities"].append(finding.severity)
         else:
-            clusters.append({"file": file, "line": line, "last_line": line, "runs": {run_index},
-                             "title": finding.title, "severities": [finding.severity]})
+            target = {"file": file, "line": line, "runs": {run_index}, "title": finding.title,
+                      "severities": [finding.severity]}
+            clusters.append(target)
+            by_file.setdefault(file, []).append(target)
     return clusters
 
 

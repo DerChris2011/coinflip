@@ -82,6 +82,12 @@ def _pct(value) -> str:
     return "n/a" if value is None else f"{value:.0f}%"
 
 
+def _seconds(value) -> str:
+    if value is None:
+        return "n/a"
+    return "<1s" if value < 1 else f"{value:.0f}s"
+
+
 def _badge(status: str) -> str:
     label, icon, cls = STATUS.get(status, (status, "", "muted"))
     return f'<span class="badge {cls}"><span aria-hidden="true">{icon}</span>{_e(label)}</span>'
@@ -178,7 +184,7 @@ def _review_body(r: dict) -> str:
         _tile(r.get("coin_flips", 0), "coin flips"),
         _tile(r.get("once", 0), "seen once"),
         _tile(_pct(r.get("stability")), "stability between runs"),
-        _tile(f'{r.get("seconds_per_run") or 0:.0f}s', "per run"),
+        _tile(_seconds(r.get("seconds_per_run")), "per run"),
     ]) + "</div>")
     if r.get("findings"):
         out.append('<h2>The coin-flip matrix</h2><p class="sub">Each row is a finding, each column one review '
