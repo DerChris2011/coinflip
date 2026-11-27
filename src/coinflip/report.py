@@ -80,6 +80,7 @@ def _canary_text(c: dict, runs: int) -> list[str]:
         f"    Reliability   {_p(c['reliability']):>5}   canaries found in >= 90% of runs",
         f"    Coin flips    {c['coin_flips']:>5}   canaries found only sometimes ({c['missed']} never)",
         f"    Recall/run    {_p(c['recall_per_run']):>5}   all runs together {_p(c['recall_all_runs'])}",
+        "    By kind       " + "  |  ".join(f"{k} {_p(v['found'])}" for k, v in c.get("by_kind", {}).items()),
     ]
     for k in c["canaries"]:
         where = f"{k['file']}:{k['line']}"
@@ -148,8 +149,10 @@ def to_markdown(r: dict) -> str:
                 f"Stability between runs: {_p(r['stability'])}.", ""]
         if r.get("canary"):
             c = r["canary"]
+            kinds = ", ".join(f"{k} {_p(v['found'])}" for k, v in c.get("by_kind", {}).items())
             out += [f"Canaries: {c['planted']} bugs planted into a copy of the code - reliably found: "
-                    f"{_p(c['reliability'])}, coin flips: {c['coin_flips']}, never found: {c['missed']}.", ""]
+                    f"{_p(c['reliability'])}, coin flips: {c['coin_flips']}, never found: {c['missed']}. "
+                    f"Found by kind: {kinds}.", ""]
         out += ["| Found | Status | Severity | Where | Finding |", "|---:|---|---|---|---|"]
         out += [f"| {f['hits']}/{r['answered_runs']} | {f['status']} | {f['severity'] or '-'} "
                 f"| `{f['file']}:{f['line']}` | {f['title']} |" for f in r["findings"][:100]]

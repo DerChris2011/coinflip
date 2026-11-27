@@ -134,8 +134,10 @@ def test_canary_candidates_skip_comments_strings_and_imports():
 
 def test_canary_language_specific_operators():
     js = "if (a === b && !c) {\n  return true;\n}\n"
-    lines = [new for _, _, new in canary.candidates("m.ts", js)]
-    assert lines == ["if (a !== b && !c) {", "  return false;"]
+    found = [(kind, new) for _, kind, new in canary.candidates("m.ts", js)]
+    assert ("equality", "if (a !== b && !c) {") in found
+    assert ("boolean", "if (a === b || !c) {") in found
+    assert ("constant", "  return false;") in found
 
 
 def test_canary_plant_is_deterministic_and_spread(tmp_path):
@@ -197,3 +199,63 @@ def test_html_escapes_reviewer_text(fake, project, tmp_path, monkeypatch):
                             "hits": 1, "rate": 1.0, "status": "consistent", "runs": [1]}], "canary": None}
     page = report_html.render(result)
     assert "<script>x" not in page and "<img src=x" not in page
+
+
+def test_canary_new_kinds():
+    ts = "async function f(id) {\n  const r = await get(encodeURIComponent(id));\n  total += r;\n}\n"
+    kinds = {kind: new for _, kind, new in canary.candidates("m.ts", ts)}
+    assert kinds["missing await"] == "  const r = get(encodeURIComponent(id));"
+    assert kinds["dropped escaping"] == "  const r = await get(id);"
+    assert kinds["accumulator"] == "  total = r;"
+    py = "for x in xs:\n    if x:\n        break\n"
+    assert ("loop control", "        continue") in [(k, n) for _, k, n in canary.candidates("m.py", py)]
+
+
+def test_canaries_are_balanced_across_kinds(tmp_path):
+    # 30 equality lines and a few of other kinds: the pick must not be all equality
+    lines = [f"if v{i} == {i}:\n    pass\n" for i in range(30)]
+    lines += ["total += 1\n\n" * 1, "\n" * 8, "ok = a and b\n", "\n" * 8, "return True\n"]
+    write(tmp_path, "m.py", "".join(lines))
+    kinds = [c.kind for c in canary.plant(tmp_path, ["m.py"], 4, seed=1)]
+    assert len(set(kinds)) == 4
+
+
+def test_test_code_is_never_mutated():
+    for rel in ["test/helpers/mock-api.ts", "src/__tests__/a.ts", "src/a.spec.ts", "tests/b.py", "pkg/x_test.go",
+                "src/fixtures/data.py", "spec/models/user_spec.rb"]:
+        assert canary._is_test_file(rel), rel
+    for rel in ["src/latest.ts", "src/contest.py", "app/attestation.go"]:
+        assert not canary._is_test_file(rel), rel
+
+
+def test_canary_match_must_be_close(fake):
+    from coinflip.findings import Finding
+    from coinflip.metrics import Run, summarize_review
+    canaries = [{"id": "canary-1", "file": "m.py", "line": 50, "kind": "equality", "original": "a", "mutated": "b"}]
+    near = Run("review", 1, 1.0, None, parsed=True, findings=[Finding("m.py", 52, "", "x")])
+    far = Run("review", 2, 1.0, None, parsed=True, findings=[Finding("m.py", 53, "", "y")])
+    s = summarize_review([near, far], canaries)
+    assert s["canary"]["canaries"][0]["hits"] == 1  # 2 lines off counts, 3 lines off does not
+    assert s["canary"]["by_kind"] == {"equality": {"planted": 1, "found": 50.0}}
+
+
+def test_canaries_avoid_spots_of_earlier_findings(tmp_path):
+    body = "\n".join(f"if x{i} == {i}:\n    pass" for i in range(20))
+    write(tmp_path, "m.py", body)
+    lines = {n for n, _, _ in canary.candidates("m.py", body)}
+    avoid = {("m.py", n) for n in lines if n < 30}
+    planted = canary.plant(tmp_path, ["m.py"], 3, seed=1, avoid=avoid)
+    assert planted and all(c.line > 30 + canary.AVOID_LINES - 1 for c in planted)
+
+
+def test_canary_run_uses_earlier_review_of_the_same_project(fake, project, tmp_path, monkeypatch, capsys):
+    assert main(["review", str(project), "-r", fake, "-n", "2"]) == 0
+    capsys.readouterr()
+    monkeypatch.setenv("FAKE_ORIG", str(project))
+    assert main(["review", str(project), "-r", fake, "-n", "2", "--canary", "2", "-f", "json"]) == 0
+    captured = capsys.readouterr()
+    assert "away from" in captured.err and "spots earlier reviews already flagged" in captured.err
+    result = json.loads(captured.out)
+    flagged = {("src/service.py", 14)}  # the SUSPICIOUS line every run reports
+    for c in result["canary"]["canaries"]:
+        assert all(c["file"] != f or abs(c["line"] - l) > canary.AVOID_LINES for f, l in flagged)

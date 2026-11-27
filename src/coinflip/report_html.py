@@ -189,6 +189,12 @@ def _review_body(r: dict) -> str:
         out.append(f'<h2>Canaries</h2><p class="sub">{canary["planted"]} small bugs were planted into a temporary '
                    f'copy of the code. Found reliably: {_pct(canary["reliability"])}, coin flips: '
                    f'{canary["coin_flips"]}, never found: {canary["missed"]}. Your files were not changed.</p>')
+        kinds = canary.get("by_kind", {})
+        if kinds:
+            out.append('<div class="tiles">' + "".join(
+                _tile(_pct(v["found"]), f'{k} ({v["planted"]} planted)') for k, v in kinds.items()) + "</div>")
+            out.append('<p class="sub">Share of runs in which a planted bug of this kind was found. '
+                       'A low value is a blind spot of the reviewer on this code - cover it with tests.</p>')
         out.append(_matrix(canary["canaries"], runs, lambda row: f'{row["kind"]}: {row["original"]} -> {row["mutated"]}'))
     if r.get("findings"):
         out.append("<h2>Findings</h2>" + _findings(r["findings"], len(runs)))

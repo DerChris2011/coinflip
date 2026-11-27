@@ -39,9 +39,9 @@ def _scope(root: Path, files: list[str], includes: tuple[str, ...], ref: str | N
 
 
 def _plant(root: Path, plan_copy: Path, scope: list[str], count: int, seed: int,
-           diff: str | None) -> tuple[list[dict], str | None]:
+           diff: str | None, avoid: set[tuple[str, int]]) -> tuple[list[dict], str | None]:
     prefer = workspace.changed_lines(root, diff, scope) if diff is not None else None
-    planted = canary.plant(plan_copy, scope, count, seed, prefer)
+    planted = canary.plant(plan_copy, scope, count, seed, prefer, avoid)
     canaries = [{"id": f"canary-{i}", **c.to_dict()} for i, c in enumerate(planted, start=1)]
     if diff is not None and planted:
         replacements = {}
@@ -53,7 +53,8 @@ def _plant(root: Path, plan_copy: Path, scope: list[str], count: int, seed: int,
 
 
 def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, canaries: int = 0,
-            seed: int = 1, inline: bool = False, max_chars: int = DEFAULT_MAX_INLINE_CHARS) -> Plan:
+            seed: int = 1, inline: bool = False, max_chars: int = DEFAULT_MAX_INLINE_CHARS,
+            avoid: set[tuple[str, int]] | None = None) -> Plan:
     root = root.resolve()
     if not root.is_dir():
         raise workspace.WorkspaceError(f"not a folder: {root}")
@@ -66,7 +67,7 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
 
     copy = workspace.make_copy(root, files)
     try:
-        planted, diff = _plant(root, copy, scope, canaries, seed, diff) if canaries else ([], diff)
+        planted, diff = _plant(root, copy, scope, canaries, seed, diff, avoid or set()) if canaries else ([], diff)
         if inline:
             content = workspace.read_files(copy, scope)
             size = sum(len(t) for t in content.values())
@@ -92,5 +93,6 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
         "files": files,
         "canaries": planted,
         "canary_seed": seed if canaries else None,
+        "canary_avoided_spots": len(avoid or ()),
     }
     return Plan(meta=meta, prompt=text, copy=copy, scope=scope)

@@ -152,14 +152,19 @@ def _cmd_review(args) -> int:
         _err(f"not installed or not on PATH: {', '.join(missing)} (see `coinflip reviewers`)")
         return EXIT_MISSING_CLI
     inline = args.inline or not all(r.agentic for r in specs)
+    avoid = session.previous_findings(args.out or session.home(), args.path) if args.canary else set()
     try:
         plan = review.prepare(args.path, tuple(args.include), args.diff, args.canary, args.seed, inline,
-                              args.max_chars)
+                              args.max_chars, avoid)
     except workspace.WorkspaceError as exc:
         _err(str(exc))
         return EXIT_USAGE
     what = f"changes vs {args.diff}" if args.diff else "whole project"
     canaries = f", {len(plan.meta['canaries'])} canaries planted" if args.canary else ""
+    if args.canary and avoid:
+        canaries += f" away from {len(avoid)} spots earlier reviews already flagged"
+    if args.canary and len(plan.meta["canaries"]) < args.canary:
+        _err(f"only {len(plan.meta['canaries'])} of {args.canary} canaries could be placed in this code")
     print(f"coinflip: reviewing {plan.meta['project']} ({what}, {len(plan.scope)} files{canaries}) - "
           f"{len(specs)} reviewer(s) x {args.runs} runs on a temporary copy", file=sys.stderr)
     try:

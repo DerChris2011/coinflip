@@ -18,6 +18,7 @@ from coinflip.findings import Finding
 RELIABLE_RATE = 0.9
 MISSED_RATE = 0.1
 CLUSTER_LINES = 3
+CANARY_LINES = 2  # a mutation is one line - a finding must point at it closely to count
 
 
 @dataclass
@@ -162,7 +163,7 @@ def split_canary_findings(run: Run, canaries: list[dict]) -> None:
     """Move findings that point at a planted canary out of the run's real findings."""
     real = []
     for f in run.findings:
-        near = [c for c in canaries if c["file"] == f.file and abs(c["line"] - f.line) <= CLUSTER_LINES]
+        near = [c for c in canaries if c["file"] == f.file and abs(c["line"] - f.line) <= CANARY_LINES]
         if near:
             run.hits.add(min(near, key=lambda c: abs(c["line"] - f.line))["id"])
         else:
@@ -179,8 +180,15 @@ def _canary_summary(answered: list[Run], canaries: list[dict]) -> dict | None:
         rows.append({**c, "hits": hits, "rate": round(hits / len(answered), 3), "status": status(hits / len(answered)),
                      "runs": sorted(r.index for r in answered if c["id"] in r.hits)})
     recalls = [len(r.hits) / len(canaries) for r in answered]
+    by_kind: dict[str, dict] = {}
+    for row in rows:
+        entry = by_kind.setdefault(row["kind"], {"planted": 0, "rates": []})
+        entry["planted"] += 1
+        entry["rates"].append(row["rate"])
+    kinds = {k: {"planted": v["planted"], "found": _pct(mean(v["rates"]))} for k, v in sorted(by_kind.items())}
     return {
         "planted": len(canaries),
+        "by_kind": kinds,
         "reliability": _pct(sum(1 for r in rows if r["status"] == "reliable") / len(canaries)),
         "coin_flips": sum(1 for r in rows if r["status"] == "coin flip"),
         "missed": sum(1 for r in rows if r["status"] == "missed"),

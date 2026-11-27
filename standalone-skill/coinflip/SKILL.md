@@ -46,8 +46,11 @@ or the last commits (`--diff HEAD~3`) instead, because every run reads the proje
 
 Other options the user may ask for:
 - more or fewer runs: `-n 10` (default here: 5)
-- measure how good the reviewer is on this code: `--canary 5` (plants 5 small bugs into a
-  temporary copy; the user's files are never changed)
+- measure how good the reviewer is on this code: `--canary 8` (plants 8 small bugs of different
+  kinds into a temporary copy, never into test code; the user's files are never changed).
+  Fewer than about 8 canaries give too coarse a picture. Canaries automatically stay away from
+  spots that earlier reviews of the same project already flagged, so a canary run is most
+  accurate after a normal review.
 
 ## 3. Run coinflip
 
@@ -95,7 +98,10 @@ Present the result short and in the user's language:
    this part is your assessment, while the counts come from coinflip.
 4. **Probably noise** - one line summarising the rest.
 5. With canaries: "On your code the reviewer found the planted bugs reliably in X % of cases,
-   Y were a coin flip." Never list canaries as findings - they only exist in the temporary copy.
+   Y were a coin flip." Then the `by_kind` breakdown: which kinds of bug it always catches and
+   which it misses (its blind spots on this code) - and recommend a unit test where a missed
+   kind sits in important logic. Never list canaries as findings - they only exist in the
+   temporary copy.
 
 Never invent findings that are not in the report, and never change the counts.
 
@@ -115,7 +121,7 @@ For a pull request or issue: `coinflip report -f markdown`.
 
 Then offer one of these, whichever fits:
 - fix the confirmed findings (ask before editing any file)
-- measure the reviewer on this code with `--canary 5`
+- measure the reviewer on this code with `--canary 8`
 
 ## Rules
 

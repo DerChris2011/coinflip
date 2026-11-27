@@ -129,18 +129,24 @@ Without `-r`, coinflip uses the first AI CLI it finds (claude, codex, gemini).
 ### How good is the reviewer on *my* code? Canaries.
 
 ```bash
-coinflip review --canary 5
+coinflip review --canary 8
 ```
 
-coinflip plants 5 small bugs into the temporary copy - a flipped comparison, a dropped
-negation, an off-by-one - and checks how often the reviewer finds them:
+coinflip plants 8 small bugs of different kinds into the temporary copy - a flipped comparison,
+a swapped `&&`/`||`, a forgotten `await`, an accumulator that overwrites, an off-by-one, a dropped
+escaping call - and checks how often the reviewer finds each kind:
 
 ```text
-  Canaries            5   bugs planted into a temporary copy of your code
-    Reliability     40%   canaries found in >= 90% of runs
-    Coin flips        2   canaries found only sometimes (1 never)
-    Recall/run      56%   all runs together 80%
+  Canaries            8   bugs planted into a temporary copy of your code
+    Reliability     50%   canaries found in >= 90% of runs
+    Coin flips        1   canaries found only sometimes (3 never)
+    Recall/run      58%   all runs together 63%
+    By kind       equality 100%  |  missing await 100%  |  boolean 0%  |  accumulator 40%  |  ...
 ```
+
+The kinds a reviewer never catches are its blind spots on your code - cover those with tests.
+Canaries are spread across kinds, kept apart from each other, never planted into test code, and
+kept away from spots that earlier reviews of the project already flagged - so run a normal review first.
 
 Canaries never show up in your findings list, and your files are never changed.
 With `--diff`, canaries go into the changed lines. Canaries are simple logic slips - a good

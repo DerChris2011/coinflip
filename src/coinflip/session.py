@@ -114,6 +114,26 @@ def collect(
         stop.set()
 
 
+def previous_findings(sessions_dir: Path, project_path: Path) -> set[tuple[str, int]]:
+    """(file, line) of every finding earlier review sessions reported for this project."""
+    spots: set[tuple[str, int]] = set()
+    if not sessions_dir.is_dir():
+        return spots
+    target = str(project_path.resolve())
+    for folder in sessions_dir.iterdir():
+        results = folder / "results.json"
+        if not results.is_file():
+            continue
+        try:
+            data = json.loads(results.read_text(encoding="utf-8"))
+            meta = load_meta(folder)
+        except (ValueError, OSError):
+            continue
+        if data.get("mode") == "review" and meta.get("project_path") == target:
+            spots.update((f["file"], f["line"]) for f in data.get("findings", []))
+    return spots
+
+
 def load_meta(session: Path) -> dict:
     path = session / "meta.json"
     if not path.is_file():
