@@ -189,6 +189,21 @@ coinflip bench show pyshop                            # the planted bugs (spoile
 Every reviewer gets the byte-identical prompt in an empty folder, with no hints about the bugs.
 Share your results: open a pull request adding your `results.json` to `results/pyshop-v1/`.
 
+## The HTML report
+
+Every review also writes a self-contained HTML report - one file, no external resources,
+light and dark mode. Its centrepiece is the **coin-flip matrix**: one row per finding, one
+column per run, a dot where that run reported it.
+
+![coinflip HTML report with the coin-flip matrix](docs/report-example.png)
+<sub>Example from the test reviewer.</sub>
+
+```bash
+coinflip review --open                          # open it in the browser when done
+coinflip report --open                          # open the latest report again
+coinflip report -f html -o coinflip-report.html # save a copy to share
+```
+
 ## Sessions
 
 Every run is stored in `~/.coinflip/sessions/` (override with `COINFLIP_HOME` or `-o`) with the

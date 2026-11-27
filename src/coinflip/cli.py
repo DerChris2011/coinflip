@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+import webbrowser
 from pathlib import Path
 
-from coinflip import __version__, benchmark, prompt, report, review, reviewers, session, workspace
+from coinflip import __version__, benchmark, prompt, report, report_html, review, reviewers, session, workspace
 from coinflip.findings import match, parse_answer
 
 RENDER = {"text": report.to_text, "markdown": report.to_markdown, "json": report.to_json}
@@ -30,6 +31,7 @@ def _common(p: argparse.ArgumentParser, runs: int) -> None:
     p.add_argument("-j", "--parallel", type=int, default=1, help="runs in parallel (default 1)")
     p.add_argument("-o", "--out", type=Path, help="where sessions are stored (default ~/.coinflip/sessions)")
     p.add_argument("-f", "--format", choices=RENDER, default="text")
+    p.add_argument("--open", action="store_true", help="open the HTML report in the browser when done")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -64,7 +66,9 @@ def _parser() -> argparse.ArgumentParser:
 
     rep = sub.add_parser("report", help="(re-)score stored sessions")
     rep.add_argument("sessions", nargs="*", type=Path, help="session folders (default: the latest one)")
-    rep.add_argument("-f", "--format", choices=RENDER, default="text")
+    rep.add_argument("-f", "--format", choices=[*RENDER, "html"], default="text")
+    rep.add_argument("-o", "--output", type=Path, help="write the report to this file")
+    rep.add_argument("--open", action="store_true", help="open the HTML report in the browser")
 
     cmp_ = sub.add_parser("compare", help="benchmark leaderboard across stored sessions")
     cmp_.add_argument("sessions", nargs="*", type=Path, help="session folders or parents (default: all)")
@@ -120,7 +124,17 @@ def _execute(args, specs, meta, jobs, label, bench=None, known=None, cwd=None) -
         results.append(result)
         sys.stdout.write(RENDER[args.format](result))
         print(f"  session saved to {folder}", file=sys.stderr)
+        print(f"  HTML report: {folder / 'report.html'}", file=sys.stderr)
+        if args.open:
+            _open(folder / "report.html")
     return results
+
+
+def _open(path: Path) -> None:
+    try:
+        webbrowser.open(path.resolve().as_uri())
+    except Exception as exc:  # no browser available (CI, SSH): the path was printed anyway
+        _err(f"could not open a browser: {exc}")
 
 
 # ---------------------------------------------------------------- commands
@@ -224,12 +238,26 @@ def _cmd_report(args) -> int:
     if not folders:
         _err("no session folders found")
         return EXIT_USAGE
+    if args.output and len(folders) > 1:
+        _err("--output works with one session at a time")
+        return EXIT_USAGE
     for folder in folders:
         try:
-            sys.stdout.write(RENDER[args.format](session.score(folder)))
+            result = session.score(folder)
         except (FileNotFoundError, benchmark.BenchmarkError) as exc:
             _err(str(exc))
             return EXIT_USAGE
+        if args.format == "html":
+            text = report_html.render(result, folder)
+        else:
+            text = RENDER[args.format](result)
+        if args.output:
+            args.output.write_text(text, encoding="utf-8")
+            print(f"coinflip: report written to {args.output}", file=sys.stderr)
+        else:
+            sys.stdout.write(text)
+        if args.open:
+            _open(args.output if args.output and args.format == "html" else folder / "report.html")
     return 0
 
 

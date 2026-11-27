@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from coinflip import __version__, benchmark, metrics, prompt, reviewers
+from coinflip import __version__, benchmark, metrics, prompt, report_html, reviewers
 from coinflip.findings import match, parse_answer
 
 Progress = Callable[[str, int, int, reviewers.Answer], None]
@@ -136,6 +136,35 @@ def _runs(session: Path, meta: dict, variant: str, known: list[str], bench=None)
     return runs
 
 
+SNIPPET_CONTEXT = 2
+MAX_SNIPPETS = 60
+
+
+def _add_snippets(rows: list[dict], read) -> None:
+    """Attach the lines around each finding, so reports can show the code itself."""
+    cache: dict[str, list[str] | None] = {}
+    for row in rows[:MAX_SNIPPETS]:
+        if row["file"] not in cache:
+            cache[row["file"]] = read(row["file"])
+        lines = cache[row["file"]]
+        if not lines or not 1 <= row["line"] <= len(lines):
+            continue
+        lo, hi = max(1, row["line"] - SNIPPET_CONTEXT), min(len(lines), row["line"] + SNIPPET_CONTEXT)
+        row["snippet"] = [[n, lines[n - 1][:300]] for n in range(lo, hi + 1)]
+
+
+def _project_reader(root: str | None):
+    def read(rel: str) -> list[str] | None:
+        if not root:
+            return None
+        path = Path(root) / rel
+        try:
+            return path.read_text(encoding="utf-8", errors="replace").splitlines() if path.is_file() else None
+        except OSError:
+            return None
+    return read
+
+
 def score(session: Path) -> dict:
     meta = load_meta(session)
     header = {k: meta.get(k) for k in ("coinflip", "reviewer", "started", "benchmark", "project", "diff",
@@ -151,9 +180,12 @@ def score(session: Path) -> dict:
         buggy = _runs(session, meta, "buggy", known, bench)
         clean = _runs(session, meta, "clean", known)
         summary = metrics.summarize_benchmark(bench, buggy, clean)
+        _add_snippets(summary.get("bugs", []), lambda rel: buggy_files.get(rel, "").splitlines() or None)
     else:
         runs = _runs(session, meta, "review", meta["files"])
         summary = metrics.summarize_review(runs, meta.get("canaries", []))
-    result = {**header, **summary}
+        _add_snippets(summary.get("findings", []), _project_reader(meta.get("project_path")))
+    result = {**header, **summary, "run_records": meta["runs"]}
     _write_json(session / "results.json", result)
+    (session / "report.html").write_text(report_html.render(result, session), encoding="utf-8")
     return result

@@ -84,6 +84,7 @@ def prepare(root: Path, includes: tuple[str, ...] = (), ref: str | None = None, 
     meta = {
         "mode": "review",
         "project": root.name,
+        "project_path": str(root),
         "diff": ref,
         "includes": list(includes),
         "inline": inline,

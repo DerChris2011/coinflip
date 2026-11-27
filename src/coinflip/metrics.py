@@ -83,6 +83,7 @@ def _bug_rows(bench: Benchmark, answered: list[Run]) -> list[dict]:
                 "hits": hits,
                 "rate": round(rate, 3),
                 "status": status(rate),
+                "runs": sorted(r.index for r in answered if bug.id in r.hits),
             }
         )
     rows.sort(key=lambda r: (-r["rate"], r["id"]))
@@ -124,6 +125,7 @@ def summarize_benchmark(bench: Benchmark, buggy: list[Run], clean: list[Run]) ->
         "stability": _pct(jaccard_mean([r.hits for r in answered])),
         "extra_findings_per_run": _avg([len(r.unmatched) for r in answered]),
         "clean_findings_per_run": _avg([len(r.findings) for r in clean_answered]),
+        "run_indexes": [r.index for r in answered],
         "bugs": rows,
     }
 
@@ -174,7 +176,8 @@ def _canary_summary(answered: list[Run], canaries: list[dict]) -> dict | None:
     rows = []
     for c in canaries:
         hits = sum(1 for r in answered if c["id"] in r.hits)
-        rows.append({**c, "hits": hits, "rate": round(hits / len(answered), 3), "status": status(hits / len(answered))})
+        rows.append({**c, "hits": hits, "rate": round(hits / len(answered), 3), "status": status(hits / len(answered)),
+                     "runs": sorted(r.index for r in answered if c["id"] in r.hits)})
     recalls = [len(r.hits) / len(canaries) for r in answered]
     return {
         "planted": len(canaries),
@@ -208,7 +211,7 @@ def summarize_review(runs: list[Run], canaries: list[dict]) -> dict:
         severity = max(c["severities"], key=lambda s: SEVERITY_ORDER.get(s, 0))
         rows.append({"file": c["file"], "line": c["line"], "severity": severity, "title": c["title"],
                      "hits": len(c["runs"]), "rate": round(len(c["runs"]) / len(answered), 3),
-                     "status": _review_status(len(c["runs"]), len(answered))})
+                     "status": _review_status(len(c["runs"]), len(answered)), "runs": sorted(c["runs"])})
     rows.sort(key=lambda r: (-r["rate"], -SEVERITY_ORDER.get(r["severity"], 0), r["file"], r["line"]))
     coverage = [len(s) / len(clusters) for s in per_run] if clusters else []
     return {
@@ -220,6 +223,7 @@ def summarize_review(runs: list[Run], canaries: list[dict]) -> dict:
         "findings_per_run": _avg([len(s) for s in per_run]),
         "single_run_coverage": _pct(mean(coverage)) if coverage else None,
         "stability": _pct(jaccard_mean(per_run)),
+        "run_indexes": [r.index for r in answered],
         "findings": rows,
         "canary": _canary_summary(answered, canaries),
     }

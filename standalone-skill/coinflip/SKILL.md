@@ -99,12 +99,23 @@ Present the result short and in the user's language:
 
 Never invent findings that are not in the report, and never change the counts.
 
-## 6. Offer the next step
+## 6. The HTML report and the next step
 
-Offer one of these, whichever fits:
+Every session already has a self-contained HTML report (the coin-flip matrix: one row per
+finding, one column per run, plus code snippets and every raw answer). coinflip printed its
+path as `HTML report: ...`. Mention it in one line and offer to open it:
+
+```bash
+uvx --from git+https://github.com/DerChris2011/coinflip@e06c98f29a4c6004f4965231824a9f8b39c3a7c7 coinflip report --open
+```
+
+If the user wants to keep or share it, ask where to save it. Do not write it into the project
+unasked. To save a copy: `coinflip report -f html -o <path>/coinflip-report.html`.
+For a pull request or issue: `coinflip report -f markdown`.
+
+Then offer one of these, whichever fits:
 - fix the confirmed findings (ask before editing any file)
 - measure the reviewer on this code with `--canary 5`
-- `coinflip report -f markdown` for a table to paste into a pull request or issue
 
 ## Rules
 

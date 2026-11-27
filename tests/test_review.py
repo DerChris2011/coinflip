@@ -171,3 +171,29 @@ def test_heartbeat_shows_long_runs(fake, project, monkeypatch, capsys):
     monkeypatch.setenv("FAKE_SLEEP", "0.7")
     assert main(["review", str(project), "-r", fake, "-n", "1"]) == 0
     assert "still working: review run 1 (0:00)" in capsys.readouterr().err
+
+
+def test_html_report(fake, project, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("FAKE_ORIG", str(project))
+    assert main(["review", str(project), "-r", fake, "-n", "4", "--canary", "2"]) == 0
+    assert "HTML report:" in capsys.readouterr().err
+    page = (_latest(tmp_path) / "report.html").read_text(encoding="utf-8")
+    assert page.startswith("<!DOCTYPE html>") and "</html>" in page
+    assert "The coin-flip matrix" in page and "Canaries" in page and "What each run said" in page
+    assert page.count('class="dot hit"') >= 4
+    assert "SELECT * FROM t WHERE name" in page  # code snippet from the project
+    assert "http" not in page.replace("https://github.com/DerChris2011/coinflip", "")  # no external resources
+    out = tmp_path / "share.html"
+    assert main(["report", "-f", "html", "-o", str(out)]) == 0
+    assert out.read_text(encoding="utf-8") == page
+
+
+def test_html_escapes_reviewer_text(fake, project, tmp_path, monkeypatch):
+    from coinflip import report_html
+    result = {"mode": "review", "project": "<script>x</script>", "diff": None, "scope_files": 1, "reviewer": "r",
+              "answered_runs": 1, "started": "", "distinct_findings": 1, "consistent": 1, "coin_flips": 0, "once": 0,
+              "stability": None, "seconds_per_run": 1.0, "single_run_coverage": 100.0, "run_indexes": [1],
+              "findings": [{"file": "a.py", "line": 1, "severity": "high", "title": "<img src=x onerror=alert(1)>",
+                            "hits": 1, "rate": 1.0, "status": "consistent", "runs": [1]}], "canary": None}
+    page = report_html.render(result)
+    assert "<script>x" not in page and "<img src=x" not in page
