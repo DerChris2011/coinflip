@@ -50,6 +50,27 @@ It only needs [uv](https://docs.astral.sh/uv/) - and asks before installing it.
 
 You can also just say: *"review my changes with coinflip, 10 runs, with canaries"*.
 
+**`/plugin` not available?** (Claude desktop app, IDE extension) Install the plugin from a terminal
+instead - it is then available everywhere Claude Code runs:
+
+```bash
+claude plugin marketplace add DerChris2011/coinflip
+claude plugin install coinflip@coinflip
+```
+
+Or copy the skill file into your personal skills folder and run it as `/coinflip`:
+
+```bash
+# macOS / Linux
+mkdir -p ~/.claude/skills/coinflip && curl -fsSL -o ~/.claude/skills/coinflip/SKILL.md \
+  https://raw.githubusercontent.com/DerChris2011/coinflip/main/standalone-skill/coinflip/SKILL.md
+```
+```powershell
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\coinflip" | Out-Null
+Invoke-WebRequest https://raw.githubusercontent.com/DerChris2011/coinflip/main/standalone-skill/coinflip/SKILL.md -OutFile "$HOME\.claude\skills\coinflip\SKILL.md"
+```
+
 ## Install the command-line tool
 
 You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and at least one AI CLI.

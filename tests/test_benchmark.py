@@ -61,3 +61,13 @@ def test_export(tmp_path):
     benchmark.export(buggy, tmp_path / "out")
     assert (tmp_path / "out" / "app" / "auth.py").read_text(encoding="utf-8") == buggy["app/auth.py"]
     assert not list((tmp_path / "out").rglob("bugs.toml"))
+
+
+def test_standalone_skill_matches_plugin_skill():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    plugin = (root / "plugins/coinflip/skills/review/SKILL.md").read_text(encoding="utf-8")
+    standalone = (root / "standalone-skill/coinflip/SKILL.md").read_text(encoding="utf-8")
+    expected = plugin.replace("name: review\n", "name: coinflip\n", 1).replace(
+        "Use when the user runs /coinflip:review,", "Use when the user runs /coinflip,", 1)
+    assert standalone == expected, "regenerate standalone-skill/coinflip/SKILL.md from the plugin skill"
