@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "coinflip-review"
+dynamic = ["version"]
+description = "Run your AI code review N times: keep what is consistent, check what is a coin flip."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["ai", "code review", "llm", "benchmark", "reliability", "claude", "codex", "gemini"]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+coinflip = "coinflip.cli:main"
+coinflip-review = "coinflip.cli:main"
+
+[tool.hatch.version]
+path = "src/coinflip/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coinflip"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
