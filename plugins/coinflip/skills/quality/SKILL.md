@@ -22,7 +22,7 @@ Run from the project root. Use what the user asked for: the whole project by def
 with `--include "src/payments/**"`, or only changed files with `--diff main` / `--diff HEAD`.
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip quality <options> -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@e1b7746029480877fe8b2b10c25c3f3c126a95d4 coinflip quality <options> -f json
 ```
 
 Key fields: `score` (0-100) and `grade` (A-E), `parts` (complexity, size, duplication,
@@ -56,7 +56,7 @@ structure, comments, overall) and shows how far the ratings of each file are apa
 one AI run per repetition, so ask first.**
 
 ```bash
-uvx --from git+https://github.com/DerChris2011/coinflip@e5dc8e402dd64c8a53a50e9d02fc9e4f63688496 coinflip readability -n 5 -j 3 -r claude --files 8 -f json
+uvx --from git+https://github.com/DerChris2011/coinflip@e1b7746029480877fe8b2b10c25c3f3c126a95d4 coinflip readability -n 5 -j 3 -r claude --files 8 -f json
 ```
 
 Run it in the background (a few minutes). Key fields: `readability` (mean, 1-10), `run_range`
