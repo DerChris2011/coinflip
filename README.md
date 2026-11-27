@@ -51,11 +51,12 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 - [Canaries: how good is the reviewer on your code?](#canaries-how-good-is-the-reviewer-on-your-code)
 - [The HTML report](#the-html-report)
 - [Did the fixes work? Progress reports](#did-the-fixes-work-progress-reports)
-- [Code quality without AI](#code-quality-without-ai)
 - [Without Claude Code: the command line](#without-claude-code-the-command-line)
 - [Reviewers](#reviewers)
 - [Benchmark and leaderboard](#benchmark-and-leaderboard)
+- [Extra: code quality and readability](#extra-code-quality-and-readability)
 - [How it works](#how-it-works)
+- [Limits](#limits)
 - [Privacy and cost](#privacy-and-cost)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
@@ -72,11 +73,13 @@ Claude:  Reviewing the whole project (38 files) 5 times on a temporary copy - yo
 | 🧩 **One command in Claude Code** | `/coinflip:review` picks the scope, runs everything, then opens each finding in your code and judges it. |
 | 🟦 **The coin-flip matrix** | A self-contained HTML report: one row per finding, one dot per run. Easy to share. |
 | 📈 **Progress reports** | Review, fix, review again - `/coinflip:progress` shows with charts how the findings went down. |
-| 🧹 **Code quality without AI** | Complexity, function size, duplication, readability, documentation and commented-out code as one score - same code, same number, every time. |
-| 📖 **Readability, rated N times** | The AI rates how readable your files are - several times. See which verdicts hold and which are a coin flip. |
 | 🏁 **Benchmark** | 15 planted bugs plus a bug-free twin, to compare reviewers head to head. |
+| 🧹 **Extra: code quality** | A rule-based quality score (no AI) as a trend line next to every review, and an optional AI readability rating with spread. |
 
 ## What it does not do
+
+coinflip **does not tell you whether a finding is true** - only how reliably the reviewer
+reports it. See [what "consistent" does not mean](#what-consistent-does-not-mean).
 
 coinflip **never changes your files**. Every review runs on a temporary copy that is deleted
 afterwards, and nothing is written into your project. It is not a linter or a security scanner
@@ -149,6 +152,23 @@ the installed version.
 Findings from different runs are merged when they point at the same spot (within 3 lines).
 Two findings of the same run are never merged - the reviewer saw two problems.
 
+### What "consistent" does not mean
+
+**Consistent is not the same as correct.** A reviewer can be sure of a false alarm and report it
+every time, and a real bug can be a coin flip. Repetition measures how *stable* the reviewer is,
+not how *right* it is - an
+[experiment with 51 runs of a local model](https://dev.to/tauridev/i-had-a-local-llm-review-the-same-code-51-times-majority-voting-picks-persistence-not-correctness-4g15)
+makes the same point. That is why:
+
+- the Claude Code skill opens every consistent and coin-flip finding in your code and judges it,
+  and says which part is its own judgement;
+- **canaries** are the only ground truth on your own code: there coinflip knows the answer;
+- **more runs do not cure blind spots.** On LightBurn MCP the reviewer found each planted bug
+  either in every run or in none. What a reviewer cannot see, it does not see five times either.
+
+What repetition does show reliably: how much a single review leaves to chance (single-run
+coverage) - and which findings you should not trust just because one review mentioned them.
+
 ## Canaries: how good is the reviewer on your code?
 
 ```text
@@ -219,76 +239,8 @@ coinflip progress --last 2        # the last two
 Counts per review are exact. Following one finding from review to review is a best guess -
 lines move when code changes and every run words its findings differently - and the report
 says so. Compare reviews with the same scope and number of runs for a fair picture.
-Every review also records the [code quality score](#code-quality-without-ai), so the report shows
+Every review also records the [code quality score](#extra-code-quality-and-readability), so the report shows
 whether the fixes made the code cleaner too - not just quieter.
-
-## Code quality without AI
-
-An AI review wobbles. A measurement should not. Every coinflip review also scores the code with
-fixed rules - no AI, no tokens, a few seconds - and you can run it on its own:
-
-```text
-/coinflip:quality
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/quality-dark.png">
-  <img alt="Code quality of LightBurn MCP: 74 of 100, grade C, documentation is the weakest part" src="docs/quality-light.png" width="860">
-</picture>
-
-<sub>[LightBurn MCP](https://github.com/DerChris2011/Lightburn_MCP) measured with `coinflip quality --open`.</sub>
-
-| Part | 100 means | Counts against it |
-|---|---|---|
-| **Complexity** | all function code has a cyclomatic complexity of 10 or less | branches upon branches |
-| **Function size** | all function code sits in functions of 50 lines or less | functions nobody reads in one go |
-| **Duplication** | no copy-pasted blocks (6+ lines) | 25 % duplicated lines = 0 |
-| **Readability** | nesting ≤ 4, ≤ 5 parameters, lines ≤ 120 chars, clear names | `data2`, `tmp`, `handleData`, cryptic one-letter names |
-| **Documentation** | every public function has a docstring / doc comment | undocumented public API |
-| **Hygiene** | nothing left lying around | commented-out code, `console.log` / `breakpoint()` / `debugger`, empty `catch` / `except: pass`, suppressed warnings, `any`, TODO/FIXME (half weight) |
-
-The score is the average of the six parts, graded A (≥ 90) to E. Test files are not held to
-these rules; they only count for the test-to-code ratio. Python, JavaScript/TypeScript, Java,
-C#, Go, Rust, C/C++, PHP, Kotlin, Swift and more are supported (complexity via
-[lizard](https://github.com/terryyin/lizard)).
-
-```bash
-coinflip quality                      # the whole project, with the worst spots
-coinflip quality --diff main          # only the files you changed
-coinflip quality --open               # HTML page
-coinflip quality --fail-under 70      # CI gate: exit code 1 below 70
-```
-
-It is a trend line, not a verdict: a 74 is not "bad code", but 74 → 81 after a clean-up is real.
-Commented-out code and documentation are detected with simple, documented heuristics, so the
-lists of offenders are meant to be skimmed, not obeyed blindly.
-
-### And what does the AI think? Readability with spread
-
-Rules can count nesting and name lengths - not whether code is easy to *understand*. That takes
-judgement, so coinflip asks the AI - several times - and shows how much the verdict wobbles:
-
-```bash
-coinflip readability -n 5 -j 3          # rates the 8 largest source files, 5 times
-```
-
-```text
-  >> readability 5.5/10 - single runs said anything from 5.1 to 6.0; 1 of 8 files is a coin flip
-
-  RATINGS                 MEAN  RANGE  RULES  STATUS     FILE
-  6 3 5 5 5 2              4.3   2-6      79  COIN FLIP  src/knowledge/index.ts
-  5 5 5 5 5 3              4.7   3-5      67  WOBBLY     src/tools/project.ts
-  4 4 4 4 4 4              4.0   4-4      73  CONSISTENT src/client.ts
-```
-
-<sub>Illustrative output (simulated ratings) - run it on your own code for real numbers.</sub>
-
-Every file gets 1-10 for naming, structure, comments and overall, plus a one-sentence reason per
-run. Files the runs agree are hard to read are your refactoring candidates; a file rated 2 in one
-run and 6 in the next has no reliable verdict - whatever a single review told you about it was
-luck. The HTML report plots every rating as a dot and puts the rule-based score of each file next
-to it (`agreement` = how well the AI's order matches the rules). In Claude Code,
-`/coinflip:quality` offers it after the rule-based score. Each run is one AI request on your plan.
 
 ## Without Claude Code: the command line
 
@@ -360,6 +312,76 @@ coinflip bench show pyshop                           # the planted bugs (spoiler
 Every reviewer gets the byte-identical prompt in an empty folder, with no hint about the bugs.
 **Share your results:** open a pull request adding your `results.json` to `results/pyshop-v1/`.
 
+## Extra: code quality and readability
+
+An AI review wobbles. A measurement should not. Every coinflip review also scores the code with
+fixed rules - no AI, no tokens, a few seconds - as a trend line next to the findings. Dedicated
+tools such as Qlty, CodeScene or SonarQube go much deeper; this score is deliberately small.
+You can run it on its own:
+
+```text
+/coinflip:quality
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/quality-dark.png">
+  <img alt="Code quality of LightBurn MCP: 74 of 100, grade C, documentation is the weakest part" src="docs/quality-light.png" width="860">
+</picture>
+
+<sub>[LightBurn MCP](https://github.com/DerChris2011/Lightburn_MCP) measured with `coinflip quality --open`.</sub>
+
+| Part | 100 means | Counts against it |
+|---|---|---|
+| **Complexity** | all function code has a cyclomatic complexity of 10 or less | branches upon branches |
+| **Function size** | all function code sits in functions of 50 lines or less | functions nobody reads in one go |
+| **Duplication** | no copy-pasted blocks (6+ lines) | 25 % duplicated lines = 0 |
+| **Readability** | nesting ≤ 4, ≤ 5 parameters, lines ≤ 120 chars, clear names | `data2`, `tmp`, `handleData`, cryptic one-letter names |
+| **Documentation** | every public function has a docstring / doc comment | undocumented public API |
+| **Hygiene** | nothing left lying around | commented-out code, `console.log` / `breakpoint()` / `debugger`, empty `catch` / `except: pass`, suppressed warnings, `any`, TODO/FIXME (half weight) |
+
+The score is the average of the six parts, graded A (≥ 90) to E. Test files are not held to
+these rules; they only count for the test-to-code ratio. Python, JavaScript/TypeScript, Java,
+C#, Go, Rust, C/C++, PHP, Kotlin, Swift and more are supported (complexity via
+[lizard](https://github.com/terryyin/lizard)).
+
+```bash
+coinflip quality                      # the whole project, with the worst spots
+coinflip quality --diff main          # only the files you changed
+coinflip quality --open               # HTML page
+coinflip quality --fail-under 70      # CI gate: exit code 1 below 70
+```
+
+It is a trend line, not a verdict: a 74 is not "bad code", but 74 → 81 after a clean-up is real.
+Commented-out code and documentation are detected with simple, documented heuristics, so the
+lists of offenders are meant to be skimmed, not obeyed blindly.
+
+### Readability, rated by the AI - with spread
+
+Rules can count nesting and name lengths - not whether code is easy to *understand*. That takes
+judgement, so coinflip asks the AI - several times - and shows how much the verdict wobbles:
+
+```bash
+coinflip readability -n 5 -j 3          # rates the 8 largest source files, 5 times
+```
+
+```text
+  >> readability 5.5/10 - single runs said anything from 5.1 to 6.0; 1 of 8 files is a coin flip
+
+  RATINGS                 MEAN  RANGE  RULES  STATUS     FILE
+  6 3 5 5 5 2              4.3   2-6      79  COIN FLIP  src/knowledge/index.ts
+  5 5 5 5 5 3              4.7   3-5      67  WOBBLY     src/tools/project.ts
+  4 4 4 4 4 4              4.0   4-4      73  CONSISTENT src/client.ts
+```
+
+<sub>Illustrative output (simulated ratings) - run it on your own code for real numbers.</sub>
+
+Every file gets 1-10 for naming, structure, comments and overall, plus a one-sentence reason per
+run. Files the runs agree are hard to read are your refactoring candidates; a file rated 2 in one
+run and 6 in the next has no reliable verdict - whatever a single review told you about it was
+luck. The HTML report plots every rating as a dot and puts the rule-based score of each file next
+to it (`agreement` = how well the AI's order matches the rules). In Claude Code,
+`/coinflip:quality` offers it after the rule-based score. Each run is one AI request on your plan.
+
 ## How it works
 
 ```mermaid
@@ -387,6 +409,22 @@ flowchart LR
   session and shown in the report.
 - **Sessions** keep the exact prompt and every raw answer, so `coinflip report` can re-score
   without paying for the runs again.
+
+## Limits
+
+coinflip is young. What you should know before you quote its numbers:
+
+- **Tested for real with Claude Code** (on Windows, on a 38-file TypeScript project). The
+  adapters for Codex, Gemini CLI and Ollama follow their documentation but have not been run
+  against the real CLIs yet - reports welcome.
+- **Matching is by location.** Findings are grouped by file and line, not by meaning. Two runs
+  describing the same problem 10 lines apart count as two findings.
+- **The benchmark is small and public:** 15 bugs in one Python project. Good for a quick
+  comparison, not a scientific leaderboard - and public bugs can end up in training data.
+- **Linking findings across reviews** (progress reports) is a best guess after code changes.
+- **The readability rating** has not yet been run against a real AI; the example above is simulated.
+- **It costs N reviews.** Use it to decide how far to trust a reviewer on your code, or before a
+  release - not on every commit.
 
 ## Privacy and cost
 
