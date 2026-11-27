@@ -118,7 +118,9 @@ fix, what is worth a look and what is probably noise.
 - *"Measure how good the reviewer is on this project, with 8 canaries."*
 - *"Open the coinflip report."*
 
-To update later: `/plugin marketplace update coinflip`.
+To update later, in a shell: `claude plugin marketplace update coinflip` and
+`claude plugin update coinflip@coinflip`, then restart Claude Code. `claude plugin list` shows
+the installed version.
 
 ## Reading the result
 
